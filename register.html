@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Регистрация</title>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+  <h1>Регистрация</h1>
+  <div id="message" style="color: red; margin-bottom: 10px;"></div>
+  <input id="nickname" type="text" placeholder="Введите ник" /><br />
+  <input id="email" type="email" placeholder="Введите email" /><br />
+  <input id="password" type="password" placeholder="Введите пароль" /><br />
+  <button id="registerBtn">Зарегистрироваться</button>
+  <p>Уже есть аккаунт? <a href="index.html">Войти</a></p>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAqzIbV2Uly03MbjpyNP9RQQx-0uDYnJdY",
+      authDomain: "yttg-3b587.firebaseapp.com",
+      projectId: "yttg-3b587",
+      storageBucket: "yttg-3b587.firebasestorage.app",
+      messagingSenderId: "77409665832",
+      appId: "1:77409665832:web:b63c780592b3dfc82a061d",
+      measurementId: "G-5VHQ23S2PP"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    function showMessage(msg, isError = true) {
+      const messageDiv = document.getElementById('message');
+      messageDiv.style.color = isError ? 'red' : 'green';
+      messageDiv.innerText = msg;
+    }
+
+    document.getElementById('registerBtn').onclick = async () => {
+      const nickname = document.getElementById('nickname').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+
+      if (!nickname) {
+        showMessage("Введите ник");
+        return;
+      }
+
+      if (!email) {
+        showMessage("Введите email");
+        return;
+      }
+
+      if (password.length < 6) {
+        showMessage("Пароль должен быть не менее 6 символов");
+        return;
+      }
+
+      try {
+        // Создаем пользователя
+        const {user} = await auth.createUserWithEmailAndPassword(email, password);
+        
+        // Сохраняем ник в Firestore
+        await db.collection('users').doc(user.uid).set({nickname});
+        
+        // Настраиваем параметры письма подтверждения
+        const actionCodeSettings = {
+          url: window.location.origin + '/index.html', // URL после подтверждения
+          handleCodeInApp: true
+        };
+        
+        // Отправляем письмо подтверждения
+        await user.sendEmailVerification(actionCodeSettings);
+        
+        showMessage("Письмо для подтверждения отправлено на email. Проверьте папку Спам!", false);
+        
+        // Выходим из аккаунта
+        await auth.signOut();
+        
+        // Перенаправляем через 3 секунды
+        setTimeout(() => {
+          window.location.href = 'index.html';
+        }, 3000);
+        
+      } catch (error) {
+        console.error("Ошибка регистрации:", error);
+        
+        let errorMessage = error.message;
+        if (error.code === 'auth/email-already-in-use') {
+          errorMessage = 'Этот email уже зарегистрирован';
+        } else if (error.code === 'auth/invalid-email') {
+          errorMessage = 'Некорректный email';
+        } else if (error.code === 'auth/weak-password') {
+          errorMessage = 'Слишком простой пароль';
+        }
+        
+        showMessage(errorMessage);
+      }
+    };
+  </script>
+</body>
+</html>
