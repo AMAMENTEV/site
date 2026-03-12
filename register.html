@@ -10,6 +10,7 @@
 <body>
   <h1>Регистрация</h1>
   <div id="message" style="color: red; margin-bottom: 10px;"></div>
+  <div id="debug" style="background: #f0f0f0; padding: 10px; margin: 10px 0; font-family: monospace; white-space: pre-wrap;"></div>
   <input id="nickname" type="text" placeholder="Введите ник" /><br />
   <input id="email" type="email" placeholder="Введите email" /><br />
   <input id="password" type="password" placeholder="Введите пароль" /><br />
@@ -27,20 +28,40 @@
       measurementId: "G-5VHQ23S2PP"
     };
 
+    // Инициализация Firebase
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.firestore();
+
+    // Функция для отладки
+    function debugLog(message, data = null) {
+      const debugDiv = document.getElementById('debug');
+      const timestamp = new Date().toLocaleTimeString();
+      let logMessage = `[${timestamp}] ${message}`;
+      if (data) {
+        logMessage += `\n${JSON.stringify(data, null, 2)}`;
+      }
+      debugDiv.innerText = logMessage + '\n\n' + debugDiv.innerText;
+      console.log(message, data);
+    }
 
     function showMessage(msg, isError = true) {
       const messageDiv = document.getElementById('message');
       messageDiv.style.color = isError ? 'red' : 'green';
       messageDiv.innerText = msg;
+      debugLog(msg, {isError});
     }
+
+    // Проверка конфигурации Firebase
+    debugLog('Firebase инициализирован');
+    debugLog('auth домен:', auth.config.authDomain);
 
     document.getElementById('registerBtn').onclick = async () => {
       const nickname = document.getElementById('nickname').value.trim();
       const email = document.getElementById('email').value.trim();
       const password = document.getElementById('password').value;
+
+      debugLog('Попытка регистрации', {nickname, email, passwordLength: password.length});
 
       if (!nickname) {
         showMessage("Введите ник");
@@ -58,19 +79,51 @@
       }
 
       try {
-        // Создаем пользователя
-        const {user} = await auth.createUserWithEmailAndPassword(email, password);
+        debugLog('Шаг 1: Создание пользователя...');
+        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        const user = userCredential.user;
         
+        debugLog('Шаг 2: Пользователь создан', {
+          uid: user.uid,
+          email: user.email,
+          emailVerified: user.emailVerified
+        });
+
         // Сохраняем ник в Firestore
+        debugLog('Шаг 3: Сохранение ника в Firestore...');
         await db.collection('users').doc(user.uid).set({nickname});
+        debugLog('Ник сохранен');
+
+        // Отправляем письмо подтверждения
+        debugLog('Шаг 4: Отправка письма подтверждения...');
         
-        // ИСПРАВЛЕНО: Упрощенные настройки для письма подтверждения
-        await user.sendEmailVerification();
+        // Попробуем разные варианты отправки
+        try {
+          // Вариант 1: Без параметров
+          await user.sendEmailVerification();
+          debugLog('Письмо отправлено (вариант 1)');
+        } catch (error1) {
+          debugLog('Ошибка варианта 1:', error1);
+          
+          try {
+            // Вариант 2: С URL
+            const actionCodeSettings = {
+              url: window.location.origin + '/index.html',
+            };
+            await user.sendEmailVerification(actionCodeSettings);
+            debugLog('Письмо отправлено (вариант 2)', actionCodeSettings);
+          } catch (error2) {
+            debugLog('Ошибка варианта 2:', error2);
+            throw new Error('Не удалось отправить письмо: ' + error2.message);
+          }
+        }
         
         showMessage("Письмо для подтверждения отправлено на email. Проверьте папку Спам!", false);
         
         // Выходим из аккаунта
+        debugLog('Шаг 5: Выход из аккаунта...');
         await auth.signOut();
+        debugLog('Выход выполнен');
         
         // Перенаправляем через 5 секунд
         setTimeout(() => {
@@ -79,6 +132,7 @@
         
       } catch (error) {
         console.error("Ошибка регистрации:", error);
+        debugLog('ОШИБКА:', {code: error.code, message: error.message, stack: error.stack});
         
         let errorMessage = error.message;
         if (error.code === 'auth/email-already-in-use') {
