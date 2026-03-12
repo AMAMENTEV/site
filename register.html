@@ -37,10 +37,12 @@
     function debugLog(message, data = null) {
       const debugDiv = document.getElementById('debug');
       const timestamp = new Date().toLocaleTimeString();
+      
       let logMessage = `[${timestamp}] ${message}`;
       if (data) {
         logMessage += `\n${JSON.stringify(data, null, 2)}`;
       }
+
       debugDiv.innerText = logMessage + '\n\n' + debugDiv.innerText;
       console.log(message, data);
     }
@@ -149,3 +151,4 @@
   </script>
 </body>
 </html>
+
