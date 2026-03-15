@@ -601,6 +601,31 @@ body {
   font-size: 0.95rem;
 }
 
+/* Кнопка "назад" – общие стили для всех устройств */
+.mobile-back-btn {
+  background: none;
+  border: none;
+  font-size: 1.8rem;
+  color: #3b82f6;
+  cursor: pointer;
+  padding: 0 10px 0 0;
+  line-height: 1;
+  width: auto;
+  flex-shrink: 0;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.messenger-container {
+  display: flex;
+  height: 100%; /* вместо 100vh */
+  background: white;
+}
+
 /* ========== МОБИЛЬНАЯ ВЕРСИЯ ========== */
 @media (max-width: 768px) {
   /* Навигационная панель скрыта */
@@ -612,7 +637,7 @@ body {
   .users-sidebar {
     display: flex !important;
     width: 100%;
-    height: 100vh;
+    height: 100%;
     border-right: none;
   }
 
@@ -620,7 +645,7 @@ body {
   .chat-area {
     display: none;
     width: 100%;
-    height: 100vh;
+    height: 100%;
     background: white;
   }
 
@@ -632,7 +657,7 @@ body {
   body.chat-mode .chat-area {
     display: flex !important;
     flex-direction: column;
-    height: 100vh;           /* фиксируем высоту */
+    height: 100%;           /* фиксируем высоту */
     overflow: hidden;         /* отключаем прокрутку всей страницы */
   }
 
