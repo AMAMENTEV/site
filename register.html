@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Регистрация</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>Регистрация</h1>
+    
+    <form id="registerForm">
+      <div class="form-group">
+        <label for="nickname">Никнейм:</label>
+        <input type="text" id="nickname" required>
+      </div>
+      
+      <div class="form-group">
+        <label for="tag">Тег (@):</label>
+        <input type="text" id="tag" pattern="@[A-Za-z0-9_]+" placeholder="@username" required>
+      </div>
+      
+      <div class="form-group">
+        <label for="email">Email:</label>
+        <input type="email" id="email" required>
+      </div>
+      
+      <div class="form-group">
+        <label for="password">Пароль:</label>
+        <input type="password" id="password" required>
+      </div>
+      
+      <button type="submit">Зарегистрироваться</button>
+    </form>
+    
+    <p>Уже есть аккаунт? <a href="index.html">Войти</a></p>
+    
+    <div id="message" class="message"></div>
+  </div>
+
+  <script src="firebase-config.js"></script>
+  <script>
+    document.getElementById('registerForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const nickname = document.getElementById('nickname').value;
+      const tag = document.getElementById('tag').value;
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      
+      try {
+        // Создание пользователя в Firebase Auth
+        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        const user = userCredential.user;
+        
+        // Сохранение дополнительной информации в Firestore
+        await db.collection('users').doc(user.uid).set({
+          nickname: nickname,
+          tag: tag,
+          email: email,
+          emailVerified: false,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        // Отправка письма для подтверждения email
+        await user.sendEmailVerification({
+          url: window.location.origin + '/profile.html'
+        });
+        
+        document.getElementById('message').innerHTML = `
+          <div class="success">
+            Регистрация успешна! Письмо для подтверждения отправлено на ${email}.
+            <br>Подтвердите email и войдите в аккаунт.
+          </div>
+        `;
+        
+        // Перенаправление на страницу входа через 3 секунды
+        setTimeout(() => {
+          window.location.href = 'index.html';
+        }, 3000);
+        
+      } catch (error) {
+        document.getElementById('message').innerHTML = `
+          <div class="error">${error.message}</div>
+        `;
+      }
+    });
+  </script>
+</body>
+</html>

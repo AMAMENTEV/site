@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Профиль</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>Профиль</h1>
+    
+    <div id="profileInfo" class="profile-info">
+      <div class="loading">Загрузка...</div>
+    </div>
+    
+    <div id="emailVerification" class="verification-message" style="display: none;">
+      ⚠️ Ваш email не подтвержден. 
+      <button onclick="sendVerificationEmail()">Отправить письмо повторно</button>
+    </div>
+    
+    <button onclick="logout()" class="logout-btn">Выйти из аккаунта</button>
+  </div>
+
+  <script src="firebase-config.js"></script>
+  <script>
+    let currentUser = null;
+    let userData = null;
+    
+    // Загрузка данных пользователя
+    auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        currentUser = user;
+        
+        // Проверка подтверждения email
+        if (user.emailVerified) {
+          document.getElementById('emailVerification').style.display = 'none';
+        } else {
+          document.getElementById('emailVerification').style.display = 'block';
+        }
+        
+        // Получение дополнительных данных из Firestore
+        const doc = await db.collection('users').doc(user.uid).get();
+        if (doc.exists) {
+          userData = doc.data();
+          displayProfile();
+        }
+      }
+    });
+    
+    function displayProfile() {
+      document.getElementById('profileInfo').innerHTML = `
+        <h2>Hello, ${userData.nickname} (${userData.tag})</h2>
+        <p>Email: ${userData.email} ${currentUser.emailVerified ? '✓' : '(не подтвержден)'}</p>
+      `;
+    }
+    
+    async function sendVerificationEmail() {
+      try {
+        await currentUser.sendEmailVerification();
+        alert('Письмо для подтверждения отправлено!');
+      } catch (error) {
+        alert('Ошибка: ' + error.message);
+      }
+    }
+    
+    function logout() {
+      auth.signOut()
+        .then(() => {
+          window.location.href = 'index.html';
+        })
+        .catch((error) => {
+          alert('Ошибка при выходе: ' + error.message);
+        });
+    }
+  </script>
+</body>
+</html>
