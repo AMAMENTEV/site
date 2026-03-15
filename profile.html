@@ -24,8 +24,6 @@
   <script src="firebase-config.js"></script>
   <script>
     auth.onAuthStateChanged(async (user) => {
-      console.log('Profile page - auth state:', user ? user.email : 'no user');
-      
       if (!user || !user.emailVerified) {
         window.location.href = 'index.html';
         return;
@@ -34,36 +32,14 @@
       const profileContent = document.getElementById('profileContent');
       
       try {
-        // Получаем данные из Firestore
         const userDoc = await db.collection('users').doc(user.uid).get();
         
         if (!userDoc.exists) {
-          console.log('Профиль не найден в Firestore, создаем...');
-          
-          // Если профиля нет, создаем его из данных Auth
-          let nickname = 'Пользователь';
-          let tag = '';
-          
-          if (user.displayName) {
-            const parts = user.displayName.split('|');
-            nickname = parts[0] || 'Пользователь';
-            tag = parts[1] || '';
-          }
-          
-          await db.collection('users').doc(user.uid).set({
-            nickname: nickname,
-            tag: tag,
-            email: user.email,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-          });
-          
-          console.log('Профиль создан');
           window.location.reload();
           return;
         }
         
         const userData = userDoc.data();
-        console.log('Данные профиля:', userData);
         
         profileContent.innerHTML = `
           <h1>Мой профиль</h1>
@@ -92,16 +68,13 @@
           </div>
           
           <div class="profile-actions">
-            <button onclick="saveChanges()" class="save-btn" id="saveBtn" style="display: none;">
-              Сохранить изменения
-            </button>
+            <button onclick="saveChanges()" class="save-btn" id="saveBtn" style="display: none;">Сохранить изменения</button>
           </div>
           
           <div id="message" class="message"></div>
         `;
         
       } catch (error) {
-        console.error('❌ Ошибка загрузки профиля:', error);
         profileContent.innerHTML = '<div class="error">Ошибка загрузки профиля</div>';
       }
     });
@@ -129,43 +102,20 @@
       const messageDiv = document.getElementById('message');
       
       const updates = {};
-      
-      if (changes.nickname) {
-        updates.nickname = document.getElementById('editNickname').value;
-      }
-      
-      if (changes.tag) {
-        updates.tag = document.getElementById('editTag').value;
-      }
+      if (changes.nickname) updates.nickname = document.getElementById('editNickname').value;
+      if (changes.tag) updates.tag = document.getElementById('editTag').value;
       
       try {
         await db.collection('users').doc(user.uid).update(updates);
-        
-        const newDisplayName = `${updates.nickname || document.getElementById('nickname').textContent}|${updates.tag || document.getElementById('tag').textContent}`;
-        await user.updateProfile({
-          displayName: newDisplayName
-        });
-        
         messageDiv.innerHTML = '<div class="success">Изменения сохранены!</div>';
-        setTimeout(() => {
-          window.location.reload();
-        }, 1500);
-        
+        setTimeout(() => window.location.reload(), 1500);
       } catch (error) {
-        console.error('Ошибка сохранения:', error);
         messageDiv.innerHTML = '<div class="error">Ошибка при сохранении</div>';
       }
     }
     
     function logout() {
-      auth.signOut()
-        .then(() => {
-          window.location.href = 'index.html';
-        })
-        .catch((error) => {
-          console.error('Ошибка при выходе:', error);
-          alert('Ошибка при выходе из аккаунта');
-        });
+      auth.signOut().then(() => window.location.href = 'index.html');
     }
   </script>
 </body>

@@ -9,45 +9,44 @@
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
 </head>
-<body>
-  <div class="container">
+<body class="auth-page">
+  <div class="auth-card">
     <h1>Регистрация</h1>
+    <p class="auth-subtitle">Создайте аккаунт чтобы начать общение</p>
     
     <form id="registerForm">
-      <div class="form-group">
-        <label for="nickname">Никнейм:</label>
-        <input type="text" id="nickname" required>
+      <div class="auth-input-group">
+        <label>Никнейм</label>
+        <input type="text" id="nickname" placeholder="Например: Anna" required>
       </div>
       
-      <div class="form-group">
-        <label for="tag">Тег (@):</label>
+      <div class="auth-input-group">
+        <label>Тег</label>
         <input type="text" id="tag" placeholder="@username" required>
       </div>
       
-      <div class="form-group">
-        <label for="email">Email:</label>
-        <input type="email" id="email" required>
+      <div class="auth-input-group">
+        <label>Email</label>
+        <input type="email" id="email" placeholder="your@email.com" required>
       </div>
       
-      <div class="form-group">
-        <label for="password">Пароль:</label>
-        <input type="password" id="password" required minlength="6">
+      <div class="auth-input-group">
+        <label>Пароль</label>
+        <input type="password" id="password" placeholder="Минимум 6 символов" required minlength="6">
       </div>
       
-      <button type="submit" id="registerBtn">Зарегистрироваться</button>
+      <button type="submit" class="auth-button" id="registerBtn">Зарегистрироваться</button>
     </form>
     
-    <p>Уже есть аккаунт? <a href="index.html">Войти</a></p>
+    <div class="auth-footer">
+      Уже есть аккаунт? <a href="index.html">Войти</a>
+    </div>
     
     <div id="message" class="message"></div>
   </div>
 
-  <!-- Подключаем ТОЛЬКО firebase-config.js, он уже содержит инициализацию -->
   <script src="firebase-config.js"></script>
   <script>
-    // НЕ НАДО заново инициализировать Firebase!
-    // auth и db уже есть из firebase-config.js
-    
     document.getElementById('registerForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       
@@ -61,19 +60,15 @@
       
       registerBtn.disabled = true;
       registerBtn.textContent = 'Регистрация...';
-      messageDiv.innerHTML = '<div class="info">Создаем аккаунт...</div>';
       
       try {
-        // 1. Создаем пользователя в Auth
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
         const user = userCredential.user;
         
-        // 2. Сохраняем ник и тег в Auth
         await user.updateProfile({
           displayName: nickname + '|' + tag
         });
         
-        // 3. СОХРАНЯЕМ В FIRESTORE
         await db.collection('users').doc(user.uid).set({
           nickname: nickname,
           tag: tag,
@@ -81,37 +76,31 @@
           createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         
-        console.log('Пользователь сохранен в Firestore:', user.uid);
-        
-        // 4. Отправляем письмо
         await user.sendEmailVerification();
-        
-        // 5. Выходим из аккаунта
         await auth.signOut();
         
-        // 6. Показываем сообщение
         messageDiv.innerHTML = `
           <div class="success">
             <h3>✅ Регистрация успешна!</h3>
-            <p>На почту <strong>${email}</strong> отправлено письмо с подтверждением.</p>
-            <p>Проверьте папку Спам.</p>
-            <p style="margin-top: 20px;">
-              <a href="index.html">Перейти на страницу входа</a>
-            </p>
+            <p>На почту ${email} отправлено письмо с подтверждением.</p>
+            <p><a href="index.html" style="color: #667eea;">Перейти ко входу →</a></p>
           </div>
         `;
         
-        // Прячем форму
         document.getElementById('registerForm').style.display = 'none';
         
       } catch (error) {
-        console.error('Ошибка регистрации:', error);
-        
         registerBtn.disabled = false;
         registerBtn.textContent = 'Зарегистрироваться';
         
-        // ПОКАЗЫВАЕМ РЕАЛЬНУЮ ОШИБКУ
-        messageDiv.innerHTML = `<div class="error">❌ ${error.message}</div>`;
+        let errorMessage = 'Ошибка при регистрации';
+        if (error.code === 'auth/email-already-in-use') {
+          errorMessage = 'Этот email уже зарегистрирован';
+        } else if (error.code === 'auth/weak-password') {
+          errorMessage = 'Пароль должен быть минимум 6 символов';
+        }
+        
+        messageDiv.innerHTML = `<div class="error">❌ ${errorMessage}</div>`;
       }
     });
   </script>

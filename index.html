@@ -8,25 +8,27 @@
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
 </head>
-<body>
-  <div class="container">
+<body class="auth-page">
+  <div class="auth-card">
     <h1>Вход в аккаунт</h1>
     
     <form id="loginForm">
-      <div class="form-group">
-        <label for="email">Email:</label>
-        <input type="email" id="email" required>
+      <div class="auth-input-group">
+        <label>Email</label>
+        <input type="email" id="email" placeholder="your@email.com" required>
       </div>
       
-      <div class="form-group">
-        <label for="password">Пароль:</label>
-        <input type="password" id="password" required>
+      <div class="auth-input-group">
+        <label>Пароль</label>
+        <input type="password" id="password" placeholder="••••••••" required>
       </div>
       
-      <button type="submit" id="loginBtn">Войти</button>
+      <button type="submit" class="auth-button" id="loginBtn">Войти</button>
     </form>
     
-    <p>Нет аккаунта? <a href="register.html">Зарегистрироваться</a></p>
+    <div class="auth-footer">
+      Нет аккаунта? <a href="register.html">Зарегистрироваться</a>
+    </div>
     
     <div id="message" class="message"></div>
   </div>
@@ -43,62 +45,24 @@
       
       loginBtn.disabled = true;
       loginBtn.textContent = 'Вход...';
-      messageDiv.innerHTML = '';
       
       try {
         const userCredential = await auth.signInWithEmailAndPassword(email, password);
         const user = userCredential.user;
         
         if (user.emailVerified) {
-          // Email подтвержден - переходим в профиль
-          window.location.href = 'profile.html';
+          window.location.href = 'messenger.html';
         } else {
-          // Email не подтвержден - показываем понятное сообщение
           messageDiv.innerHTML = `
             <div class="warning">
               <strong>ⓘ Аккаунт не активирован</strong>
-              <p style="margin-top: 10px;">На почту <strong>${email}</strong> было отправлено письмо с подтверждением.</p>
-              <p>Пожалуйста, перейдите по ссылке в письме, чтобы активировать аккаунт.</p>
-              <p style="font-size: 0.9em; color: #666; margin-top: 10px;">
-                Не пришло письмо? Проверьте папку Спам или 
-                <a href="register.html">зарегистрируйтесь заново</a>
-              </p>
+              <p>На почту ${email} отправлено письмо с подтверждением.</p>
             </div>
           `;
-          
-          // Выходим из аккаунта
           await auth.signOut();
         }
       } catch (error) {
-        console.error(error);
-        
-        let errorMessage = '';
-        let errorTitle = '';
-        
-        if (error.code === 'auth/user-not-found') {
-          errorTitle = 'Аккаунт не существует';
-          errorMessage = 'Пользователь с таким email не зарегистрирован.';
-        } else if (error.code === 'auth/wrong-password') {
-          errorTitle = 'Неверный пароль';
-          errorMessage = 'Проверьте правильность ввода пароля.';
-        } else if (error.code === 'auth/too-many-requests') {
-          errorTitle = 'Слишком много попыток';
-          errorMessage = 'Попробуйте позже или восстановите пароль.';
-        } else {
-          errorTitle = 'Ошибка входа';
-          errorMessage = 'Проверьте правильность введенных данных.';
-        }
-        
-        messageDiv.innerHTML = `
-          <div class="error">
-            <strong>❌ ${errorTitle}</strong>
-            <p style="margin-top: 10px;">${errorMessage}</p>
-            <p style="margin-top: 15px; font-size: 0.9em;">
-              <a href="register.html">Зарегистрироваться</a> | 
-              <a href="#" onclick="location.reload()">Попробовать снова</a>
-            </p>
-          </div>
-        `;
+        messageDiv.innerHTML = `<div class="error">❌ Неверный email или пароль</div>`;
       } finally {
         loginBtn.disabled = false;
         loginBtn.textContent = 'Войти';

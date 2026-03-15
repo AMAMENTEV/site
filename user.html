@@ -28,7 +28,6 @@
         return;
       }
       
-      // Получаем ID пользователя из URL
       const urlParams = new URLSearchParams(window.location.search);
       const userId = urlParams.get('id');
       
@@ -38,13 +37,12 @@
       }
       
       try {
-        // Получаем данные пользователя
         const userDoc = await db.collection('users').doc(userId).get();
         
         if (!userDoc.exists) {
           document.getElementById('userProfileContent').innerHTML = `
             <div class="error">Пользователь не найден</div>
-            <a href="messenger.html" class="back-btn">Вернуться в мессенджер</a>
+            <a href="messenger.html" style="display: block; text-align: center; margin-top: 20px; color: #667eea;">Вернуться в мессенджер</a>
           `;
           return;
         }

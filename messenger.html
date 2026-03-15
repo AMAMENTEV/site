@@ -47,6 +47,10 @@
     </div>
   </div>
 
+  <!-- Мобильное меню -->
+  <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+  <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
   <script src="firebase-config.js"></script>
   <script>
     let currentUser = null;
@@ -74,16 +78,12 @@
       usersList.innerHTML = '<div class="loading">Загрузка пользователей...</div>';
       
       try {
-        // Получаем всех пользователей из Firestore
         const snapshot = await db.collection('users').get();
         console.log('📊 Всего документов в Firestore:', snapshot.size);
         
         allUsers = [];
         
         snapshot.forEach(doc => {
-          console.log('📄 Документ:', doc.id, doc.data());
-          
-          // Добавляем всех пользователей, кроме текущего
           if (doc.id !== currentUser.uid) {
             allUsers.push({
               id: doc.id,
@@ -109,7 +109,6 @@
     function displayUsers(users) {
       const usersList = document.getElementById('usersList');
       
-      // Сортируем по нику
       users.sort((a, b) => (a.nickname || '').localeCompare(b.nickname || ''));
       
       usersList.innerHTML = users.map(user => {
@@ -152,8 +151,8 @@
         <div class="selected-user" onclick="openUserProfile('${userId}')">
           <div class="chat-user-avatar-placeholder">${nickname.charAt(0).toUpperCase()}</div>
           <div class="chat-user-info">
-            <div class="chat-user-name">${nickname}</div>
-            <div class="chat-user-tag">${tag}</div>
+            <h3>${nickname}</h3>
+            <p>${tag}</p>
           </div>
         </div>
       `;
@@ -220,12 +219,28 @@
             const isMyMessage = msg.senderId === currentUser.uid;
             const time = msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
             
-            messagesHTML += `
-              <div class="message ${isMyMessage ? 'my-message' : 'other-message'}">
-                <div class="message-content">${msg.text}</div>
-                <div class="message-time">${time}</div>
-              </div>
-            `;
+            // Для сообщений других пользователей показываем аватар
+            if (isMyMessage) {
+              messagesHTML += `
+                <div class="message-wrapper my-message">
+                  <div class="message-bubble">
+                    <p>${msg.text}</p>
+                    <div class="message-time">${time}</div>
+                  </div>
+                  <div class="message-avatar">${currentUser.displayName?.charAt(0) || 'Я'}</div>
+                </div>
+              `;
+            } else {
+              messagesHTML += `
+                <div class="message-wrapper">
+                  <div class="message-avatar">${selectedUser.nickname.charAt(0).toUpperCase()}</div>
+                  <div class="message-bubble">
+                    <p>${msg.text}</p>
+                    <div class="message-time">${time}</div>
+                  </div>
+                </div>
+              `;
+            }
           });
           
           messagesContainer.innerHTML = messagesHTML;
@@ -275,16 +290,11 @@
           alert('Ошибка при выходе из аккаунта');
         });
     }
+    
+    function toggleSidebar() {
+      document.querySelector('.users-sidebar').classList.toggle('active');
+      document.querySelector('.sidebar-overlay').classList.toggle('active');
+    }
   </script>
-<!-- Добавьте перед закрывающим тегом </body> -->
-<button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
-<div class="sidebar-overlay" onclick="toggleSidebar()"></div>
-
-<script>
-function toggleSidebar() {
-  document.querySelector('.users-sidebar').classList.toggle('active');
-  document.querySelector('.sidebar-overlay').classList.toggle('active');
-}
-</script>
 </body>
 </html>
