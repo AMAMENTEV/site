@@ -24,22 +24,38 @@ auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
     console.log('❌ Ошибка настройки сессии:', error);
   });
 
-// Проверка авторизации (простая версия)
+// Проверка авторизации (ИСПРАВЛЕННАЯ ВЕРСИЯ)
 auth.onAuthStateChanged((user) => {
   const currentPage = window.location.pathname.split('/').pop() || 'index.html';
   
+  // Если мы на странице регистрации - НИЧЕГО НЕ ДЕЛАЕМ, даем пользователю зарегистрироваться
+  if (currentPage === 'register.html') {
+    console.log('📝 Страница регистрации - не перенаправляем');
+    return;
+  }
+  
+  // Если мы на странице входа - тоже ничего не делаем принудительно
+  if (currentPage === 'index.html') {
+    console.log('🔑 Страница входа - не перенаправляем автоматически');
+    return;
+  }
+  
+  // Для всех остальных страниц проверяем авторизацию
   if (user && user.emailVerified) {
     console.log('✅ Пользователь авторизован:', user.email);
-    if (currentPage === 'index.html' || currentPage === 'register.html') {
+    // Если пользователь на защищенной странице - оставляем, если нет - перенаправляем
+    if (currentPage !== 'messenger.html' && currentPage !== 'profile.html') {
       window.location.href = 'messenger.html';
     }
   } else if (user && !user.emailVerified) {
     console.log('⏳ Email не подтвержден');
+    // Если пользователь на защищенной странице с неподтвержденным email - отправляем на вход
     if (currentPage === 'messenger.html' || currentPage === 'profile.html') {
       window.location.href = 'index.html';
     }
   } else {
     console.log('❌ Пользователь не авторизован');
+    // Если пользователь не авторизован на защищенной странице - отправляем на вход
     if (currentPage === 'messenger.html' || currentPage === 'profile.html') {
       window.location.href = 'index.html';
     }
