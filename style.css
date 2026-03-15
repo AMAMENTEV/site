@@ -433,7 +433,7 @@ body {
 .back-btn {
   background: none;
   border: none;
-  font-size: 0.7rem; 
+  font-size: 1.0rem; 
   color: #3b82f6;
   cursor: pointer;
   padding: 0;
@@ -709,7 +709,7 @@ html, body {
   .mobile-back-btn {
     background: none;
   border: none;
-  font-size: 0.7rem; /* Увеличиваем размер стрелки */
+  font-size: 1.0rem; /* Увеличиваем размер стрелки */
   color: #3b82f6;
   cursor: pointer;
   padding: 0;
