@@ -10,16 +10,25 @@ const firebaseConfig = {
 };
 
 
+// Инициализация Firebase
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-// Запоминаем пользователя
-auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+// ВАЖНО: включаем постоянное сохранение сессии
+auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
+  .then(() => {
+    console.log('Сохранение сессии включено');
+  })
+  .catch((error) => {
+    console.log('Ошибка настройки сохранения:', error);
+  });
 
 // Создаем коллекцию пользователей в Firestore при первом входе
 auth.onAuthStateChanged(async (user) => {
   if (user && user.emailVerified) {
+    console.log('Пользователь авторизован:', user.email);
+    
     // Проверяем, есть ли пользователь в Firestore
     const userDoc = await db.collection('users').doc(user.uid).get();
     
@@ -41,6 +50,12 @@ auth.onAuthStateChanged(async (user) => {
         email: user.email,
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
+      
+      console.log('Профиль пользователя создан в Firestore');
     }
+  } else if (user && !user.emailVerified) {
+    console.log('Email не подтвержден');
+  } else {
+    console.log('Пользователь не авторизован');
   }
 });

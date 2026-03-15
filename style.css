@@ -566,3 +566,45 @@ small {
   font-size: 0.8rem;
   margin-top: 0.25rem;
 }
+
+/* В конец файла style.css добавьте: */
+
+.header {
+  padding: 15px 0;
+  border-bottom: 1px solid #e0e0e0;
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logout-small-header {
+  background: #f56565;
+  padding: 5px 15px;
+  font-size: 0.9rem;
+  width: auto;
+  border-radius: 5px;
+}
+
+.logout-small-header:hover {
+  background: #e53e3e;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.logout-small {
+  background: #f56565;
+  padding: 5px 10px;
+  font-size: 0.8rem;
+  width: auto;
+  border-radius: 5px;
+  margin: 0;
+}
+
+.logout-small:hover {
+  background: #e53e3e;
+}

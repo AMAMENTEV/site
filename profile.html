@@ -13,6 +13,7 @@
   <div class="container">
     <div class="header">
       <a href="messenger.html" class="back-btn">← Мессенджер</a>
+      <button onclick="logout()" class="logout-small-header">Выйти</button>
     </div>
     
     <div id="profileContent" class="profile-page">
@@ -31,48 +32,56 @@
       
       const profileContent = document.getElementById('profileContent');
       
-      // Получаем данные из Firestore
-      const userDoc = await db.collection('users').doc(user.uid).get();
-      const userData = userDoc.data() || {
-        nickname: 'Пользователь',
-        tag: ''
-      };
-      
-      profileContent.innerHTML = `
-        <h1>Мой профиль</h1>
+      try {
+        // Получаем данные из Firestore
+        const userDoc = await db.collection('users').doc(user.uid).get();
         
-        <div class="profile-avatar-placeholder">
-          <div class="avatar-large">${userData.nickname.charAt(0).toUpperCase()}</div>
-        </div>
+        if (!userDoc.exists) {
+          profileContent.innerHTML = '<div class="error">Профиль не найден</div>';
+          return;
+        }
         
-        <div class="profile-info">
-          <div class="info-row">
-            <label>Никнейм:</label>
-            <span id="nickname">${userData.nickname}</span>
-            <button onclick="editNickname()" class="edit-btn">✎</button>
+        const userData = userDoc.data();
+        
+        profileContent.innerHTML = `
+          <h1>Мой профиль</h1>
+          
+          <div class="profile-avatar-placeholder">
+            <div class="avatar-large">${userData.nickname ? userData.nickname.charAt(0).toUpperCase() : '?'}</div>
           </div>
           
-          <div class="info-row">
-            <label>Тег:</label>
-            <span id="tag">${userData.tag}</span>
-            <button onclick="editTag()" class="edit-btn">✎</button>
+          <div class="profile-info">
+            <div class="info-row">
+              <label>Никнейм:</label>
+              <span id="nickname">${userData.nickname || 'Не указан'}</span>
+              <button onclick="editNickname()" class="edit-btn">✎</button>
+            </div>
+            
+            <div class="info-row">
+              <label>Тег:</label>
+              <span id="tag">${userData.tag || 'Не указан'}</span>
+              <button onclick="editTag()" class="edit-btn">✎</button>
+            </div>
+            
+            <div class="info-row">
+              <label>Email:</label>
+              <span>${userData.email}</span>
+            </div>
           </div>
           
-          <div class="info-row">
-            <label>Email:</label>
-            <span>${userData.email}</span>
+          <div class="profile-actions">
+            <button onclick="saveChanges()" class="save-btn" id="saveBtn" style="display: none;">
+              Сохранить изменения
+            </button>
           </div>
-        </div>
+          
+          <div id="message" class="message"></div>
+        `;
         
-        <div class="profile-actions">
-          <button onclick="saveChanges()" class="save-btn" id="saveBtn" style="display: none;">
-            Сохранить изменения
-          </button>
-          <button onclick="logout()" class="logout-btn">Выйти из аккаунта</button>
-        </div>
-        
-        <div id="message" class="message"></div>
-      `;
+      } catch (error) {
+        console.error('Ошибка загрузки профиля:', error);
+        profileContent.innerHTML = '<div class="error">Ошибка загрузки профиля</div>';
+      }
     });
     
     let changes = {};
@@ -125,14 +134,20 @@
         }, 1500);
         
       } catch (error) {
+        console.error('Ошибка сохранения:', error);
         messageDiv.innerHTML = '<div class="error">Ошибка при сохранении</div>';
       }
     }
     
     function logout() {
-      auth.signOut().then(() => {
-        window.location.href = 'index.html';
-      });
+      auth.signOut()
+        .then(() => {
+          window.location.href = 'index.html';
+        })
+        .catch((error) => {
+          console.error('Ошибка при выходе:', error);
+          alert('Ошибка при выходе из аккаунта');
+        });
     }
   </script>
 </body>

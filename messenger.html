@@ -15,7 +15,10 @@
     <div class="users-sidebar">
       <div class="sidebar-header">
         <h2>Пользователи</h2>
-        <a href="profile.html" class="profile-link">Мой профиль</a>
+        <div class="header-actions">
+          <a href="profile.html" class="profile-link">Мой профиль</a>
+          <button onclick="logout()" class="logout-small">Выйти</button>
+        </div>
       </div>
       
       <div class="search-box">
@@ -54,7 +57,14 @@
     
     // Проверка авторизации
     auth.onAuthStateChanged(async (user) => {
-      if (!user || !user.emailVerified) {
+      console.log('Auth state changed:', user ? user.email : 'no user');
+      
+      if (!user) {
+        window.location.href = 'index.html';
+        return;
+      }
+      
+      if (!user.emailVerified) {
         window.location.href = 'index.html';
         return;
       }
@@ -66,44 +76,57 @@
     // Загрузка списка пользователей
     async function loadUsers() {
       const usersList = document.getElementById('usersList');
+      usersList.innerHTML = '<div class="loading">Загрузка пользователей...</div>';
       
-      // Получаем всех пользователей кроме текущего
-      const snapshot = await db.collection('users').get();
-      allUsers = [];
-      
-      snapshot.forEach(doc => {
-        if (doc.id !== currentUser.uid) {
-          allUsers.push({
-            id: doc.id,
-            ...doc.data()
-          });
+      try {
+        // Получаем всех пользователей кроме текущего
+        const snapshot = await db.collection('users').get();
+        console.log('Найдено документов:', snapshot.size);
+        
+        allUsers = [];
+        
+        snapshot.forEach(doc => {
+          console.log('Документ:', doc.id, doc.data());
+          if (doc.id !== currentUser.uid) {
+            allUsers.push({
+              id: doc.id,
+              ...doc.data()
+            });
+          }
+        });
+        
+        console.log('Пользователей кроме текущего:', allUsers.length);
+        
+        if (allUsers.length === 0) {
+          usersList.innerHTML = '<div class="no-users">Пока нет других пользователей</div>';
+        } else {
+          displayUsers(allUsers);
         }
-      });
-      
-      displayUsers(allUsers);
+        
+      } catch (error) {
+        console.error('Ошибка загрузки пользователей:', error);
+        usersList.innerHTML = '<div class="error">Ошибка загрузки пользователей</div>';
+      }
     }
     
     function displayUsers(users) {
       const usersList = document.getElementById('usersList');
-      
-      if (users.length === 0) {
-        usersList.innerHTML = '<div class="no-users">Пока нет других пользователей</div>';
-        return;
-      }
       
       // Сортируем по нику
       users.sort((a, b) => a.nickname.localeCompare(b.nickname));
       
       usersList.innerHTML = users.map(user => {
         // Берем первую букву ника для аватара
-        const firstLetter = user.nickname.charAt(0).toUpperCase();
+        const firstLetter = user.nickname ? user.nickname.charAt(0).toUpperCase() : '?';
+        const tag = user.tag || '';
+        const nickname = user.nickname || 'Без имени';
         
         return `
-          <div class="user-item" onclick="selectUser('${user.id}', '${user.nickname}', '${user.tag}')">
+          <div class="user-item" onclick="selectUser('${user.id}', '${nickname.replace(/'/g, "\\'")}', '${tag.replace(/'/g, "\\'")}')">
             <div class="user-avatar-placeholder">${firstLetter}</div>
             <div class="user-info">
-              <div class="user-name">${user.nickname}</div>
-              <div class="user-tag">${user.tag}</div>
+              <div class="user-name">${nickname}</div>
+              <div class="user-tag">${tag}</div>
             </div>
           </div>
         `;
@@ -119,8 +142,8 @@
       }
       
       const filtered = allUsers.filter(user => 
-        user.nickname.toLowerCase().includes(searchText) || 
-        user.tag.toLowerCase().includes(searchText)
+        (user.nickname && user.nickname.toLowerCase().includes(searchText)) || 
+        (user.tag && user.tag.toLowerCase().includes(searchText))
       );
       
       displayUsers(filtered);
@@ -155,40 +178,47 @@
         unsubscribeMessages();
       }
       
-      // Ищем существующий чат
-      const chatsSnapshot = await db.collection('chats')
-        .where('participants', 'array-contains', currentUser.uid)
-        .get();
-      
-      let chatId = null;
-      
-      chatsSnapshot.forEach(doc => {
-        const chat = doc.data();
-        if (chat.participants.includes(selectedUser.id)) {
-          chatId = doc.id;
-        }
-      });
-      
-      if (chatId) {
-        currentChatId = chatId;
-      } else {
-        // Создаем новый чат
-        const newChat = await db.collection('chats').add({
-          participants: [currentUser.uid, selectedUser.id],
-          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-          lastMessage: null,
-          lastMessageTime: null
+      try {
+        // Ищем существующий чат
+        const chatsSnapshot = await db.collection('chats')
+          .where('participants', 'array-contains', currentUser.uid)
+          .get();
+        
+        let chatId = null;
+        
+        chatsSnapshot.forEach(doc => {
+          const chat = doc.data();
+          if (chat.participants.includes(selectedUser.id)) {
+            chatId = doc.id;
+          }
         });
-        currentChatId = newChat.id;
+        
+        if (chatId) {
+          currentChatId = chatId;
+        } else {
+          // Создаем новый чат
+          const newChat = await db.collection('chats').add({
+            participants: [currentUser.uid, selectedUser.id],
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            lastMessage: null,
+            lastMessageTime: null
+          });
+          currentChatId = newChat.id;
+        }
+        
+        // Загружаем сообщения
+        loadMessages();
+        
+      } catch (error) {
+        console.error('Ошибка создания чата:', error);
       }
-      
-      // Загружаем сообщения
-      loadMessages();
     }
     
     // Загрузка сообщений
     function loadMessages() {
       const messagesContainer = document.getElementById('messagesContainer');
+      
+      if (!currentChatId) return;
       
       unsubscribeMessages = db.collection('chats').doc(currentChatId)
         .collection('messages')
@@ -215,6 +245,9 @@
           
           messagesContainer.innerHTML = messagesHTML;
           messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }, (error) => {
+          console.error('Ошибка загрузки сообщений:', error);
+          messagesContainer.innerHTML = '<div class="error">Ошибка загрузки сообщений</div>';
         });
     }
     
@@ -243,6 +276,7 @@
         
         input.value = '';
       } catch (error) {
+        console.error('Ошибка отправки:', error);
         alert('Ошибка при отправке сообщения');
       }
     }
@@ -250,6 +284,18 @@
     // Открыть профиль пользователя
     function openUserProfile(userId) {
       window.location.href = `user.html?id=${userId}`;
+    }
+    
+    // Выход из аккаунта
+    function logout() {
+      auth.signOut()
+        .then(() => {
+          window.location.href = 'index.html';
+        })
+        .catch((error) => {
+          console.error('Ошибка при выходе:', error);
+          alert('Ошибка при выходе из аккаунта');
+        });
     }
   </script>
 </body>
