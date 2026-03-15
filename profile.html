@@ -14,7 +14,7 @@
     <h1>Профиль</h1>
     
     <div id="profileInfo" class="profile-info">
-      <div class="loading">Загрузка...</div>
+      <div class="loading">Загрузка данных...</div>
     </div>
     
     <div id="emailVerification" class="verification-message" style="display: none;">
@@ -27,43 +27,73 @@
 
   <script src="firebase-config.js"></script>
   <script>
-    let currentUser = null;
-    let userData = null;
-    
-    // Загрузка данных пользователя
+    // Функция для загрузки данных профиля
+    async function loadProfile(user) {
+      try {
+        // Получение дополнительных данных из Firestore
+        const doc = await db.collection('users').doc(user.uid).get();
+        
+        if (doc.exists) {
+          const userData = doc.data();
+          
+          // Обновляем информацию в профиле
+          document.getElementById('profileInfo').innerHTML = `
+            <div class="welcome-message">
+              <h2>Hello, ${userData.nickname} (${userData.tag})</h2>
+              <p>Email: ${userData.email} ${user.emailVerified ? '✓' : ''}</p>
+            </div>
+          `;
+        } else {
+          // Если данных нет в Firestore, используем данные из Auth
+          document.getElementById('profileInfo').innerHTML = `
+            <div class="welcome-message">
+              <h2>Hello, User</h2>
+              <p>Email: ${user.email}</p>
+            </div>
+          `;
+        }
+      } catch (error) {
+        console.error('Ошибка загрузки профиля:', error);
+        document.getElementById('profileInfo').innerHTML = `
+          <div class="error">Ошибка загрузки данных</div>
+        `;
+      }
+    }
+
+    // Проверка состояния аутентификации
     auth.onAuthStateChanged(async (user) => {
       if (user) {
-        currentUser = user;
+        // Пользователь вошел в систему
         
         // Проверка подтверждения email
         if (user.emailVerified) {
           document.getElementById('emailVerification').style.display = 'none';
+          await loadProfile(user);
         } else {
           document.getElementById('emailVerification').style.display = 'block';
+          document.getElementById('profileInfo').innerHTML = `
+            <div class="info-message">
+              <p>Пожалуйста, подтвердите ваш email, чтобы увидеть профиль</p>
+            </div>
+          `;
         }
-        
-        // Получение дополнительных данных из Firestore
-        const doc = await db.collection('users').doc(user.uid).get();
-        if (doc.exists) {
-          userData = doc.data();
-          displayProfile();
-        }
+      } else {
+        // Пользователь не вошел - перенаправляем на страницу входа
+        window.location.href = 'index.html';
       }
     });
     
-    function displayProfile() {
-      document.getElementById('profileInfo').innerHTML = `
-        <h2>Hello, ${userData.nickname} (${userData.tag})</h2>
-        <p>Email: ${userData.email} ${currentUser.emailVerified ? '✓' : '(не подтвержден)'}</p>
-      `;
-    }
-    
     async function sendVerificationEmail() {
       try {
-        await currentUser.sendEmailVerification();
-        alert('Письмо для подтверждения отправлено!');
+        const user = auth.currentUser;
+        if (user) {
+          await user.sendEmailVerification({
+            url: window.location.origin + '/profile.html'
+          });
+          alert('✅ Письмо для подтверждения отправлено! Проверьте вашу почту.');
+        }
       } catch (error) {
-        alert('Ошибка: ' + error.message);
+        alert('❌ Ошибка: ' + error.message);
       }
     }
     
