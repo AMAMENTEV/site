@@ -10,20 +10,22 @@
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
 </head>
 <body>
+  <!-- Верхняя панель с кнопками -->
+  <div class="top-nav">
+    <div class="nav-left">
+      <h2>Пользователи</h2>
+    </div>
+    <div class="nav-right">
+      <a href="profile.html" class="nav-profile-btn">Мой профиль</a>
+      <button onclick="logout()" class="nav-logout-btn">Выйти</button>
+    </div>
+  </div>
+
   <div class="messenger-container">
     <!-- Левая панель - список пользователей -->
     <div class="users-sidebar">
-      <div class="sidebar-header">
-        <h2>Пользователи</h2>
-        <div class="header-actions">
-          <a href="profile.html" class="profile-link">Мой профиль</a>
-          <button onclick="logout()" class="logout-small">Выйти</button>
-        </div>
-      </div>
-      
-      <!-- Профиль текущего пользователя в левой панели -->
-      <div id="currentUserProfile" class="current-user-profile">
-        <!-- Будет заполнено через JS -->
+      <div class="current-user-profile" id="currentUserProfile">
+        <!-- Данные текущего пользователя -->
       </div>
       
       <div class="search-box">
@@ -65,10 +67,7 @@
     let unsubscribeMessages = null;
     let allUsers = [];
     
-    // Проверка авторизации
     auth.onAuthStateChanged(async (user) => {
-      console.log('Auth state changed:', user ? user.email : 'no user');
-      
       if (!user || !user.emailVerified) {
         window.location.href = 'index.html';
         return;
@@ -86,28 +85,25 @@
       loadUsers();
     });
     
-    // Отображение текущего пользователя в левой панели
     function displayCurrentUser() {
       const profileDiv = document.getElementById('currentUserProfile');
       const firstLetter = currentUserData.nickname ? currentUserData.nickname.charAt(0).toUpperCase() : '?';
       
       profileDiv.innerHTML = `
-        <div class="current-user-avatar">${firstLetter}</div>
-        <div class="current-user-info">
-          <h3>${currentUserData.nickname || 'Пользователь'}</h3>
-          <p>${currentUserData.tag || ''}</p>
+        <div class="user-avatar-placeholder" style="width: 48px; height: 48px;">${firstLetter}</div>
+        <div class="user-info">
+          <div class="user-name">${currentUserData.nickname || 'Пользователь'}</div>
+          <div class="user-tag">${currentUserData.tag || ''}</div>
         </div>
       `;
     }
     
-    // Загрузка списка пользователей
     async function loadUsers() {
       const usersList = document.getElementById('usersList');
       usersList.innerHTML = '<div class="loading">Загрузка пользователей...</div>';
       
       try {
         const snapshot = await db.collection('users').get();
-        console.log('📊 Всего документов в Firestore:', snapshot.size);
         
         allUsers = [];
         
@@ -120,8 +116,6 @@
           }
         });
         
-        console.log('👥 Пользователей кроме текущего:', allUsers.length);
-        
         if (allUsers.length === 0) {
           usersList.innerHTML = '<div class="no-users">Пока нет других пользователей</div>';
         } else {
@@ -129,7 +123,6 @@
         }
         
       } catch (error) {
-        console.error('❌ Ошибка загрузки пользователей:', error);
         usersList.innerHTML = '<div class="error">Ошибка загрузки пользователей</div>';
       }
     }
@@ -283,7 +276,6 @@
         
         input.value = '';
       } catch (error) {
-        console.error('Ошибка отправки:', error);
         alert('Ошибка при отправке сообщения');
       }
     }
@@ -298,7 +290,6 @@
           window.location.href = 'index.html';
         })
         .catch((error) => {
-          console.error('Ошибка при выходе:', error);
           alert('Ошибка при выходе из аккаунта');
         });
     }
