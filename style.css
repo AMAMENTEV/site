@@ -822,10 +822,17 @@ html, body {
   }
 }
 
-/* Для десктопа кнопка меню и back скрыты */
+/* Для десктопа кнопка меню скрыта */
 @media (min-width: 769px) {
-  .mobile-menu-btn{
+  .mobile-menu-btn,
+  .mobile-popup-menu,
+  .sidebar-overlay {
     display: none !important;
+  }
+  
+  /* Стрелка назад на десктопе тоже должна быть видна */
+  .mobile-back-btn {
+    display: inline-block;
   }
 }
 
