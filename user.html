@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Профиль пользователя</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <a href="messenger.html" class="back-btn">← Мессенджер</a>
+    </div>
+    
+    <div id="userProfileContent" class="profile-page">
+      <div class="loading">Загрузка профиля...</div>
+    </div>
+  </div>
+
+  <script src="firebase-config.js"></script>
+  <script>
+    auth.onAuthStateChanged(async (user) => {
+      if (!user || !user.emailVerified) {
+        window.location.href = 'index.html';
+        return;
+      }
+      
+      // Получаем ID пользователя из URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const userId = urlParams.get('id');
+      
+      if (!userId) {
+        window.location.href = 'messenger.html';
+        return;
+      }
+      
+      try {
+        // Получаем данные пользователя
+        const userDoc = await db.collection('users').doc(userId).get();
+        
+        if (!userDoc.exists) {
+          document.getElementById('userProfileContent').innerHTML = `
+            <div class="error">Пользователь не найден</div>
+            <a href="messenger.html" class="back-btn">Вернуться в мессенджер</a>
+          `;
+          return;
+        }
+        
+        const userData = userDoc.data();
+        const firstLetter = userData.nickname.charAt(0).toUpperCase();
+        
+        document.getElementById('userProfileContent').innerHTML = `
+          <h1>Профиль пользователя</h1>
+          
+          <div class="profile-avatar-placeholder">
+            <div class="avatar-large">${firstLetter}</div>
+          </div>
+          
+          <div class="profile-info">
+            <div class="info-row">
+              <label>Никнейм:</label>
+              <span>${userData.nickname}</span>
+            </div>
+            
+            <div class="info-row">
+              <label>Тег:</label>
+              <span>${userData.tag}</span>
+            </div>
+          </div>
+          
+          <button onclick="startChat('${userId}', '${userData.nickname}', '${userData.tag}')" class="chat-btn">
+            Написать сообщение
+          </button>
+        `;
+        
+      } catch (error) {
+        document.getElementById('userProfileContent').innerHTML = `
+          <div class="error">Ошибка загрузки профиля</div>
+        `;
+      }
+    });
+    
+    function startChat(userId, nickname, tag) {
+      window.location.href = `messenger.html?user=${userId}`;
+    }
+  </script>
+</body>
+</html>

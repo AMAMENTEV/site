@@ -3,61 +3,136 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Профиль</title>
+  <title>Мой профиль</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
 </head>
 <body>
   <div class="container">
-    <div id="profileContent" style="text-align: center;">
-      <!-- Содержимое будет заполнено через JavaScript -->
+    <div class="header">
+      <a href="messenger.html" class="back-btn">← Мессенджер</a>
+    </div>
+    
+    <div id="profileContent" class="profile-page">
+      <!-- Содержимое будет заполнено -->
     </div>
   </div>
 
   <script src="firebase-config.js"></script>
   <script>
-    // Проверяем авторизацию
-    auth.onAuthStateChanged((user) => {
-      const profileContent = document.getElementById('profileContent');
-      
+    // Загрузка профиля
+    auth.onAuthStateChanged(async (user) => {
       if (!user || !user.emailVerified) {
-        // Если не авторизован или email не подтвержден - отправляем на вход
         window.location.href = 'index.html';
         return;
       }
       
-      // Парсим ник и тег из displayName (формат: "никнейм|@тег")
-      let nickname = 'Пользователь';
-      let tag = '';
+      const profileContent = document.getElementById('profileContent');
       
-      if (user.displayName) {
-        const parts = user.displayName.split('|');
-        nickname = parts[0] || 'Пользователь';
-        tag = parts[1] || '';
-      }
+      // Получаем данные из Firestore
+      const userDoc = await db.collection('users').doc(user.uid).get();
+      const userData = userDoc.data() || {
+        nickname: 'Пользователь',
+        tag: ''
+      };
       
-      // Показываем только приветствие
       profileContent.innerHTML = `
-        <h1>Профиль</h1>
-        <div class="welcome-message">
-          <h2>Hello, ${nickname} ${tag}</h2>
-          <p style="margin-top: 10px; color: #666;">${user.email}</p>
+        <h1>Мой профиль</h1>
+        
+        <div class="profile-avatar-placeholder">
+          <div class="avatar-large">${userData.nickname.charAt(0).toUpperCase()}</div>
         </div>
-        <button onclick="logout()" class="logout-btn" style="margin-top: 20px;">
-          Выйти из аккаунта
-        </button>
+        
+        <div class="profile-info">
+          <div class="info-row">
+            <label>Никнейм:</label>
+            <span id="nickname">${userData.nickname}</span>
+            <button onclick="editNickname()" class="edit-btn">✎</button>
+          </div>
+          
+          <div class="info-row">
+            <label>Тег:</label>
+            <span id="tag">${userData.tag}</span>
+            <button onclick="editTag()" class="edit-btn">✎</button>
+          </div>
+          
+          <div class="info-row">
+            <label>Email:</label>
+            <span>${userData.email}</span>
+          </div>
+        </div>
+        
+        <div class="profile-actions">
+          <button onclick="saveChanges()" class="save-btn" id="saveBtn" style="display: none;">
+            Сохранить изменения
+          </button>
+          <button onclick="logout()" class="logout-btn">Выйти из аккаунта</button>
+        </div>
+        
+        <div id="message" class="message"></div>
       `;
     });
     
-    function logout() {
-      auth.signOut()
-        .then(() => {
-          window.location.href = 'index.html';
-        })
-        .catch((error) => {
-          alert('Ошибка при выходе: ' + error.message);
+    let changes = {};
+    
+    function editNickname() {
+      const span = document.getElementById('nickname');
+      const current = span.textContent;
+      span.innerHTML = `<input type="text" id="editNickname" value="${current}">`;
+      changes.nickname = true;
+      document.getElementById('saveBtn').style.display = 'block';
+    }
+    
+    function editTag() {
+      const span = document.getElementById('tag');
+      const current = span.textContent;
+      span.innerHTML = `<input type="text" id="editTag" value="${current}" placeholder="@tag">`;
+      changes.tag = true;
+      document.getElementById('saveBtn').style.display = 'block';
+    }
+    
+    async function saveChanges() {
+      const user = auth.currentUser;
+      const messageDiv = document.getElementById('message');
+      
+      const updates = {};
+      
+      if (changes.nickname) {
+        updates.nickname = document.getElementById('editNickname').value;
+      }
+      
+      if (changes.tag) {
+        updates.tag = document.getElementById('editTag').value;
+      }
+      
+      try {
+        // Обновляем в Firestore
+        await db.collection('users').doc(user.uid).update(updates);
+        
+        // Обновляем displayName в Auth
+        const currentUserDoc = await db.collection('users').doc(user.uid).get();
+        const currentData = currentUserDoc.data();
+        const newDisplayName = `${currentData.nickname}|${currentData.tag}`;
+        await user.updateProfile({
+          displayName: newDisplayName
         });
+        
+        messageDiv.innerHTML = '<div class="success">Изменения сохранены!</div>';
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+        
+      } catch (error) {
+        messageDiv.innerHTML = '<div class="error">Ошибка при сохранении</div>';
+      }
+    }
+    
+    function logout() {
+      auth.signOut().then(() => {
+        window.location.href = 'index.html';
+      });
     }
   </script>
 </body>

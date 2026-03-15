@@ -12,6 +12,35 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
+const db = firebase.firestore();
 
 // Запоминаем пользователя
 auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+
+// Создаем коллекцию пользователей в Firestore при первом входе
+auth.onAuthStateChanged(async (user) => {
+  if (user && user.emailVerified) {
+    // Проверяем, есть ли пользователь в Firestore
+    const userDoc = await db.collection('users').doc(user.uid).get();
+    
+    if (!userDoc.exists) {
+      // Парсим ник и тег из displayName (формат: "никнейм|@тег")
+      let nickname = 'Пользователь';
+      let tag = '';
+      
+      if (user.displayName) {
+        const parts = user.displayName.split('|');
+        nickname = parts[0] || 'Пользователь';
+        tag = parts[1] || '';
+      }
+      
+      // Создаем документ пользователя
+      await db.collection('users').doc(user.uid).set({
+        nickname: nickname,
+        tag: tag,
+        email: user.email,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
+  }
+});

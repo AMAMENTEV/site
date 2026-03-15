@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Мессенджер</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+</head>
+<body>
+  <div class="messenger-container">
+    <!-- Левая панель - список пользователей -->
+    <div class="users-sidebar">
+      <div class="sidebar-header">
+        <h2>Пользователи</h2>
+        <a href="profile.html" class="profile-link">Мой профиль</a>
+      </div>
+      
+      <div class="search-box">
+        <input type="text" id="searchInput" placeholder="Поиск по нику или тегу..." onkeyup="searchUsers()">
+      </div>
+      
+      <div class="users-list" id="usersList">
+        <div class="loading">Загрузка пользователей...</div>
+      </div>
+    </div>
+    
+    <!-- Правая панель - чат -->
+    <div class="chat-area">
+      <div class="chat-header" id="chatHeader">
+        <div class="no-chat-selected">Выберите пользователя для начала чата</div>
+      </div>
+      
+      <div class="messages-container" id="messagesContainer">
+        <!-- Сообщения будут здесь -->
+      </div>
+      
+      <div class="message-input-area" id="messageInputArea" style="display: none;">
+        <input type="text" id="messageInput" placeholder="Введите сообщение..." onkeypress="if(event.key==='Enter') sendMessage()">
+        <button onclick="sendMessage()">→</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="firebase-config.js"></script>
+  <script>
+    let currentUser = null;
+    let selectedUser = null;
+    let currentChatId = null;
+    let unsubscribeMessages = null;
+    let allUsers = [];
+    
+    // Проверка авторизации
+    auth.onAuthStateChanged(async (user) => {
+      if (!user || !user.emailVerified) {
+        window.location.href = 'index.html';
+        return;
+      }
+      
+      currentUser = user;
+      loadUsers();
+    });
+    
+    // Загрузка списка пользователей
+    async function loadUsers() {
+      const usersList = document.getElementById('usersList');
+      
+      // Получаем всех пользователей кроме текущего
+      const snapshot = await db.collection('users').get();
+      allUsers = [];
+      
+      snapshot.forEach(doc => {
+        if (doc.id !== currentUser.uid) {
+          allUsers.push({
+            id: doc.id,
+            ...doc.data()
+          });
+        }
+      });
+      
+      displayUsers(allUsers);
+    }
+    
+    function displayUsers(users) {
+      const usersList = document.getElementById('usersList');
+      
+      if (users.length === 0) {
+        usersList.innerHTML = '<div class="no-users">Пока нет других пользователей</div>';
+        return;
+      }
+      
+      // Сортируем по нику
+      users.sort((a, b) => a.nickname.localeCompare(b.nickname));
+      
+      usersList.innerHTML = users.map(user => {
+        // Берем первую букву ника для аватара
+        const firstLetter = user.nickname.charAt(0).toUpperCase();
+        
+        return `
+          <div class="user-item" onclick="selectUser('${user.id}', '${user.nickname}', '${user.tag}')">
+            <div class="user-avatar-placeholder">${firstLetter}</div>
+            <div class="user-info">
+              <div class="user-name">${user.nickname}</div>
+              <div class="user-tag">${user.tag}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+    
+    function searchUsers() {
+      const searchText = document.getElementById('searchInput').value.toLowerCase();
+      
+      if (!searchText) {
+        displayUsers(allUsers);
+        return;
+      }
+      
+      const filtered = allUsers.filter(user => 
+        user.nickname.toLowerCase().includes(searchText) || 
+        user.tag.toLowerCase().includes(searchText)
+      );
+      
+      displayUsers(filtered);
+    }
+    
+    // Выбор пользователя для чата
+    function selectUser(userId, nickname, tag) {
+      selectedUser = { id: userId, nickname, tag };
+      
+      // Обновляем шапку чата
+      document.getElementById('chatHeader').innerHTML = `
+        <div class="selected-user" onclick="openUserProfile('${userId}')">
+          <div class="chat-user-avatar-placeholder">${nickname.charAt(0).toUpperCase()}</div>
+          <div class="chat-user-info">
+            <div class="chat-user-name">${nickname}</div>
+            <div class="chat-user-tag">${tag}</div>
+          </div>
+        </div>
+      `;
+      
+      // Показываем поле ввода
+      document.getElementById('messageInputArea').style.display = 'flex';
+      
+      // Создаем или получаем чат
+      createOrGetChat();
+    }
+    
+    // Создание или получение чата
+    async function createOrGetChat() {
+      // Отписываемся от предыдущего чата
+      if (unsubscribeMessages) {
+        unsubscribeMessages();
+      }
+      
+      // Ищем существующий чат
+      const chatsSnapshot = await db.collection('chats')
+        .where('participants', 'array-contains', currentUser.uid)
+        .get();
+      
+      let chatId = null;
+      
+      chatsSnapshot.forEach(doc => {
+        const chat = doc.data();
+        if (chat.participants.includes(selectedUser.id)) {
+          chatId = doc.id;
+        }
+      });
+      
+      if (chatId) {
+        currentChatId = chatId;
+      } else {
+        // Создаем новый чат
+        const newChat = await db.collection('chats').add({
+          participants: [currentUser.uid, selectedUser.id],
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          lastMessage: null,
+          lastMessageTime: null
+        });
+        currentChatId = newChat.id;
+      }
+      
+      // Загружаем сообщения
+      loadMessages();
+    }
+    
+    // Загрузка сообщений
+    function loadMessages() {
+      const messagesContainer = document.getElementById('messagesContainer');
+      
+      unsubscribeMessages = db.collection('chats').doc(currentChatId)
+        .collection('messages')
+        .orderBy('timestamp', 'asc')
+        .onSnapshot((snapshot) => {
+          if (snapshot.empty) {
+            messagesContainer.innerHTML = '<div class="no-messages">Нет сообщений. Напишите что-нибудь!</div>';
+            return;
+          }
+          
+          let messagesHTML = '';
+          snapshot.forEach(doc => {
+            const msg = doc.data();
+            const isMyMessage = msg.senderId === currentUser.uid;
+            const time = msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
+            
+            messagesHTML += `
+              <div class="message ${isMyMessage ? 'my-message' : 'other-message'}">
+                <div class="message-content">${msg.text}</div>
+                <div class="message-time">${time}</div>
+              </div>
+            `;
+          });
+          
+          messagesContainer.innerHTML = messagesHTML;
+          messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        });
+    }
+    
+    // Отправка сообщения
+    async function sendMessage() {
+      const input = document.getElementById('messageInput');
+      const text = input.value.trim();
+      
+      if (!text || !currentChatId) return;
+      
+      try {
+        await db.collection('chats').doc(currentChatId)
+          .collection('messages')
+          .add({
+            text: text,
+            senderId: currentUser.uid,
+            receiverId: selectedUser.id,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        
+        // Обновляем последнее сообщение в чате
+        await db.collection('chats').doc(currentChatId).update({
+          lastMessage: text,
+          lastMessageTime: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        input.value = '';
+      } catch (error) {
+        alert('Ошибка при отправке сообщения');
+      }
+    }
+    
+    // Открыть профиль пользователя
+    function openUserProfile(userId) {
+      window.location.href = `user.html?id=${userId}`;
+    }
+  </script>
+</body>
+</html>
