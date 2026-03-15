@@ -11,7 +11,7 @@
 </head>
 <body>
   <div class="messenger-container">
-    <!-- Первая колонка - навигация -->
+    <!-- Первая колонка - навигация (десктоп) -->
     <div class="nav-sidebar">
       <h2>Меню</h2>
       <div class="nav-buttons">
@@ -19,33 +19,35 @@
         <button onclick="logout()" class="nav-button logout">Выйти</button>
       </div>
     </div>
-    
+
     <!-- Вторая колонка - список пользователей -->
     <div class="users-sidebar" id="usersSidebar">
+      <!-- На мобилках здесь будет синяя кнопка-бургер (добавим через JS) -->
       <div class="users-header">
         <h2>Пользователи</h2>
         <p>Выберите кому написать</p>
       </div>
-      
+
       <div class="search-box">
         <input type="text" id="searchInput" placeholder="Поиск по нику или тегу..." onkeyup="searchUsers()">
       </div>
-      
+
       <div class="users-list" id="usersList">
         <div class="loading">Загрузка пользователей...</div>
       </div>
     </div>
-    
+
     <!-- Третья колонка - чат -->
-    <div class="chat-area">
+    <div class="chat-area" id="chatArea">
+      <!-- Шапка чата. На мобилках в неё добавится кнопка "назад" -->
       <div class="chat-header" id="chatHeader">
-        <div class="no-chat-selected">Выберите пользователя для начала чата</div>
+        <div class="no-chat-selected" id="noChatMessage">Выберите пользователя для начала чата</div>
       </div>
-      
+
       <div class="messages-container" id="messagesContainer">
-        <!-- Сообщения будут здесь -->
+        <!-- Сообщения -->
       </div>
-      
+
       <div class="message-input-area" id="messageInputArea" style="display: none;">
         <input type="text" id="messageInput" placeholder="Введите сообщение..." onkeypress="if(event.key==='Enter') sendMessage()">
         <button onclick="sendMessage()" id="sendButton">→</button>
@@ -53,31 +55,38 @@
     </div>
   </div>
 
-  <!-- Мобильное меню -->
-  <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
-  <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+  <!-- Мобильное меню (бургер) – видно только на мобилках, когда открыт список пользователей -->
+  <button class="mobile-menu-btn" id="mobileMenuBtn" onclick="toggleMobileMenu()">☰</button>
+
+  <!-- Оверлей для мобильного меню (бургера) -->
+  <div class="sidebar-overlay" id="mobileMenuOverlay" onclick="toggleMobileMenu()"></div>
+
+  <!-- Всплывающее меню (бургер) – появляется при клике на синюю кнопку -->
+  <div class="mobile-popup-menu" id="mobilePopupMenu">
+    <a href="profile.html" class="popup-item">Мой профиль</a>
+    <button onclick="logout()" class="popup-item logout">Выйти</button>
+  </div>
 
   <script src="firebase-config.js"></script>
   <script>
+    // ---------- Глобальные переменные ----------
     let currentUser = null;
     let currentUserData = null;
     let selectedUser = null;
     let currentChatId = null;
     let unsubscribeMessages = null;
     let allUsers = [];
-    
-    // Проверка авторизации
+
+    // Для мобильного режима: показываем список или чат
+    let isChatMode = false; // true – показываем чат, false – список пользователей
+
+    // ---------- Проверка авторизации ----------
     auth.onAuthStateChanged(async (user) => {
-      console.log('Auth state:', user ? user.email : 'no user');
-      
       if (!user || !user.emailVerified) {
         window.location.href = 'index.html';
         return;
       }
-      
       currentUser = user;
-      
-      // Получаем данные текущего пользователя
       try {
         const userDoc = await db.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
@@ -86,54 +95,38 @@
       } catch (error) {
         console.error('Ошибка загрузки пользователя:', error);
       }
-      
       loadUsers();
     });
-    
-    // Загрузка списка пользователей
+
+    // ---------- Загрузка списка пользователей ----------
     async function loadUsers() {
       const usersList = document.getElementById('usersList');
       usersList.innerHTML = '<div class="loading">Загрузка пользователей...</div>';
-      
       try {
         const snapshot = await db.collection('users').get();
-        console.log('Загружено пользователей:', snapshot.size);
-        
         allUsers = [];
-        
         snapshot.forEach(doc => {
           if (doc.id !== currentUser.uid) {
-            allUsers.push({
-              id: doc.id,
-              ...doc.data()
-            });
+            allUsers.push({ id: doc.id, ...doc.data() });
           }
         });
-        
-        console.log('Пользователей кроме текущего:', allUsers.length);
-        
         if (allUsers.length === 0) {
           usersList.innerHTML = '<div class="no-users">Пока нет других пользователей</div>';
         } else {
           displayUsers(allUsers);
         }
-        
       } catch (error) {
-        console.error('Ошибка загрузки:', error);
-        usersList.innerHTML = '<div class="error">Ошибка загрузки пользователей</div>';
+        usersList.innerHTML = '<div class="error">Ошибка загрузки</div>';
       }
     }
-    
+
     function displayUsers(users) {
       const usersList = document.getElementById('usersList');
-      
       users.sort((a, b) => (a.nickname || '').localeCompare(b.nickname || ''));
-      
       usersList.innerHTML = users.map(user => {
         const firstLetter = user.nickname ? user.nickname.charAt(0).toUpperCase() : '?';
         const tag = user.tag || '';
         const nickname = user.nickname || 'Без имени';
-        
         return `
           <div class="user-item" onclick="selectUser('${user.id}', '${nickname.replace(/'/g, "\\'")}', '${tag.replace(/'/g, "\\'")}')">
             <div class="user-avatar-placeholder">${firstLetter}</div>
@@ -145,30 +138,30 @@
         `;
       }).join('');
     }
-    
+
     function searchUsers() {
       const searchText = document.getElementById('searchInput').value.toLowerCase();
-      
       if (!searchText) {
         displayUsers(allUsers);
         return;
       }
-      
-      const filtered = allUsers.filter(user => 
-        (user.nickname && user.nickname.toLowerCase().includes(searchText)) || 
+      const filtered = allUsers.filter(user =>
+        (user.nickname && user.nickname.toLowerCase().includes(searchText)) ||
         (user.tag && user.tag.toLowerCase().includes(searchText))
       );
-      
       displayUsers(filtered);
     }
-    
+
+    // ---------- Выбор пользователя для чата ----------
     function selectUser(userId, nickname, tag) {
-      console.log('Выбран пользователь:', userId, nickname);
-      
       selectedUser = { id: userId, nickname, tag };
-      
-      document.getElementById('chatHeader').innerHTML = `
+
+      // Показываем шапку с выбранным пользователем (для десктопа и мобилок)
+      const chatHeader = document.getElementById('chatHeader');
+      chatHeader.innerHTML = `
         <div class="selected-user">
+          <!-- Кнопка "назад" видна только на мобилках, управляется через CSS -->
+          <button class="mobile-back-btn" onclick="exitChatMode()">←</button>
           <div class="chat-user-avatar-placeholder">${nickname.charAt(0).toUpperCase()}</div>
           <div class="chat-user-info">
             <h3>${nickname}</h3>
@@ -176,39 +169,55 @@
           </div>
         </div>
       `;
-      
+
       document.getElementById('messageInputArea').style.display = 'flex';
-      
-      // На мобильных устройствах после выбора пользователя скрываем сайдбар
+
+      // На мобильных устройствах переключаемся в режим чата
       if (window.innerWidth <= 768) {
-        toggleSidebar();
+        enterChatMode();
       }
-      
+
       createOrGetChat();
     }
-    
-    async function createOrGetChat() {
+
+    // ---------- Переключение режимов на мобилках ----------
+    function enterChatMode() {
+      isChatMode = true;
+      document.body.classList.add('chat-mode');        // скрываем список пользователей
+      document.getElementById('mobileMenuBtn').style.display = 'none'; // прячем синюю кнопку
+    }
+
+    function exitChatMode() {
+      isChatMode = false;
+      document.body.classList.remove('chat-mode');    // показываем список
+      document.getElementById('mobileMenuBtn').style.display = 'flex'; // показываем синюю кнопку
+
+      // Очищаем чат
       if (unsubscribeMessages) {
         unsubscribeMessages();
+        unsubscribeMessages = null;
       }
-      
+      selectedUser = null;
+      currentChatId = null;
+      document.getElementById('chatHeader').innerHTML = '<div class="no-chat-selected">Выберите пользователя для начала чата</div>';
+      document.getElementById('messagesContainer').innerHTML = '';
+      document.getElementById('messageInputArea').style.display = 'none';
+    }
+
+    // ---------- Создание/получение чата ----------
+    async function createOrGetChat() {
+      if (unsubscribeMessages) unsubscribeMessages();
       try {
         const chatsSnapshot = await db.collection('chats')
           .where('participants', 'array-contains', currentUser.uid)
           .get();
-        
         let chatId = null;
-        
         chatsSnapshot.forEach(doc => {
           const chat = doc.data();
-          if (chat.participants.includes(selectedUser.id)) {
-            chatId = doc.id;
-          }
+          if (chat.participants.includes(selectedUser.id)) chatId = doc.id;
         });
-        
         if (chatId) {
           currentChatId = chatId;
-          console.log('Чат найден:', chatId);
         } else {
           const newChat = await db.collection('chats').add({
             participants: [currentUser.uid, selectedUser.id],
@@ -217,63 +226,50 @@
             lastMessageTime: null
           });
           currentChatId = newChat.id;
-          console.log('Чат создан:', currentChatId);
         }
-        
         loadMessages();
-        
       } catch (error) {
         console.error('Ошибка создания чата:', error);
       }
     }
-    
+
+    // ---------- Загрузка сообщений ----------
     function loadMessages() {
-      const messagesContainer = document.getElementById('messagesContainer');
-      
       if (!currentChatId) return;
-      
+      const messagesContainer = document.getElementById('messagesContainer');
       unsubscribeMessages = db.collection('chats').doc(currentChatId)
         .collection('messages')
         .orderBy('timestamp', 'asc')
-        .onSnapshot((snapshot) => {
+        .onSnapshot(snapshot => {
           if (snapshot.empty) {
             messagesContainer.innerHTML = '<div class="no-messages">Нет сообщений. Напишите что-нибудь!</div>';
             return;
           }
-          
-          let messagesHTML = '';
+          let html = '';
           snapshot.forEach(doc => {
             const msg = doc.data();
             const isMyMessage = msg.senderId === currentUser.uid;
-            const time = msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
-            
-            messagesHTML += `
+            const time = msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+            html += `
               <div class="message ${isMyMessage ? 'my-message' : 'other-message'}">
                 <div class="message-content">${msg.text}</div>
                 <div class="message-time">${time}</div>
               </div>
             `;
           });
-          
-          messagesContainer.innerHTML = messagesHTML;
+          messagesContainer.innerHTML = html;
           messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }, (error) => {
-          console.error('Ошибка загрузки сообщений:', error);
-        });
+        }, error => console.error('Ошибка загрузки сообщений:', error));
     }
-    
+
+    // ---------- Отправка сообщения ----------
     async function sendMessage() {
       const input = document.getElementById('messageInput');
       const text = input.value.trim();
-      
-      if (!text || !currentChatId || !selectedUser) {
-        console.log('Невозможно отправить:', {text, currentChatId, selectedUser});
-        return;
-      }
-      
-      // Очищаем поле сразу
-      input.value = '';
-      
+      if (!text || !currentChatId || !selectedUser) return;
+
+      input.value = ''; // очищаем сразу
+
       try {
         await db.collection('chats').doc(currentChatId)
           .collection('messages')
@@ -283,38 +279,46 @@
             receiverId: selectedUser.id,
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
           });
-        
         await db.collection('chats').doc(currentChatId).update({
           lastMessage: text,
           lastMessageTime: firebase.firestore.FieldValue.serverTimestamp()
         });
-        
       } catch (error) {
         console.error('Ошибка отправки:', error);
         alert('Ошибка при отправке сообщения');
-        // Возвращаем текст обратно если ошибка
-        input.value = text;
+        input.value = text; // возвращаем текст
       }
     }
-    
-    function logout() {
-      auth.signOut()
-        .then(() => {
-          window.location.href = 'index.html';
-        })
-        .catch((error) => {
-          console.error('Ошибка при выходе:', error);
-          alert('Ошибка при выходе из аккаунта');
-        });
-    }
-    
-    function toggleSidebar() {
-      const sidebar = document.getElementById('usersSidebar');
-      const overlay = document.querySelector('.sidebar-overlay');
-      
-      sidebar.classList.toggle('active');
+
+    // ---------- Мобильное меню (бургер) ----------
+    function toggleMobileMenu() {
+      const menu = document.getElementById('mobilePopupMenu');
+      const overlay = document.getElementById('mobileMenuOverlay');
+      menu.classList.toggle('active');
       overlay.classList.toggle('active');
     }
+
+    // ---------- Выход ----------
+    function logout() {
+      auth.signOut().then(() => window.location.href = 'index.html');
+    }
+
+    // ---------- Обработка resize для мобильного режима ----------
+    window.addEventListener('resize', () => {
+      if (window.innerWidth > 768) {
+        // На десктопе всегда показываем всё
+        document.body.classList.remove('chat-mode');
+        document.getElementById('mobileMenuBtn').style.display = 'none';
+        if (isChatMode) isChatMode = false; // сброс режима
+      } else {
+        // На мобилке: если мы не в чате, показываем синюю кнопку
+        if (!isChatMode) {
+          document.getElementById('mobileMenuBtn').style.display = 'flex';
+        } else {
+          document.getElementById('mobileMenuBtn').style.display = 'none';
+        }
+      }
+    });
   </script>
 </body>
 </html>
