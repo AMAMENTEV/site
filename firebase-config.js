@@ -10,33 +10,8 @@ const firebaseConfig = {
 };
 
 
-// Инициализация Firebase
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 
 // Запоминаем пользователя
 auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-
-// Проверка авторизации
-auth.onAuthStateChanged((user) => {
-  const currentPage = window.location.pathname.split('/').pop() || 'index.html';
-  
-  if (user && user.emailVerified) {
-    // Если пользователь авторизован и email подтвержден
-    if (currentPage !== 'profile.html') {
-      window.location.href = 'profile.html';
-    }
-  } else if (user && !user.emailVerified) {
-    // Если пользователь авторизован, но email не подтвержден
-    if (currentPage === 'profile.html') {
-      // Остаемся на profile.html, там покажем сообщение
-    } else {
-      window.location.href = 'profile.html';
-    }
-  } else {
-    // Если пользователь не авторизован
-    if (currentPage === 'profile.html') {
-      window.location.href = 'index.html';
-    }
-  }
-});

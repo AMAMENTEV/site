@@ -10,7 +10,7 @@
 </head>
 <body>
   <div class="container">
-    <div id="profileContent">
+    <div id="profileContent" style="text-align: center;">
       <!-- Содержимое будет заполнено через JavaScript -->
     </div>
   </div>
@@ -21,65 +21,34 @@
     auth.onAuthStateChanged((user) => {
       const profileContent = document.getElementById('profileContent');
       
-      if (user) {
-        if (user.emailVerified) {
-          // Email подтвержден - показываем приветствие
-          const displayName = user.displayName || 'User';
-          
-          // Парсим ник и тег из displayName
-          let nickname = displayName;
-          let tag = '';
-          
-          const match = displayName.match(/(.+) \((@.+)\)/);
-          if (match) {
-            nickname = match[1];
-            tag = match[2];
-          }
-          
-          profileContent.innerHTML = `
-            <h1>Профиль</h1>
-            <div class="welcome-message">
-              <h2>Hello, ${nickname} ${tag ? '(' + tag + ')' : ''}</h2>
-              <p>Email: ${user.email} ✓</p>
-            </div>
-            <button onclick="logout()" class="logout-btn">Выйти из аккаунта</button>
-          `;
-        } else {
-          // Email не подтвержден
-          profileContent.innerHTML = `
-            <h1>Подтверждение email</h1>
-            <div class="warning">
-              <h2>⚠️ Email не подтвержден</h2>
-              <p>На почту <strong>${user.email}</strong> было отправлено письмо с подтверждением.</p>
-              <p>Пожалуйста, перейдите по ссылке в письме, чтобы активировать аккаунт.</p>
-              <button onclick="resendVerification()" class="resend-btn">
-                Отправить письмо повторно
-              </button>
-              <button onclick="logout()" class="logout-btn" style="margin-top: 1rem; background-color: #666;">
-                Выйти
-              </button>
-            </div>
-          `;
-        }
-      } else {
-        // Не авторизован
+      if (!user || !user.emailVerified) {
+        // Если не авторизован или email не подтвержден - отправляем на вход
         window.location.href = 'index.html';
+        return;
       }
+      
+      // Парсим ник и тег из displayName (формат: "никнейм|@тег")
+      let nickname = 'Пользователь';
+      let tag = '';
+      
+      if (user.displayName) {
+        const parts = user.displayName.split('|');
+        nickname = parts[0] || 'Пользователь';
+        tag = parts[1] || '';
+      }
+      
+      // Показываем только приветствие
+      profileContent.innerHTML = `
+        <h1>Профиль</h1>
+        <div class="welcome-message">
+          <h2>Hello, ${nickname} ${tag}</h2>
+          <p style="margin-top: 10px; color: #666;">${user.email}</p>
+        </div>
+        <button onclick="logout()" class="logout-btn" style="margin-top: 20px;">
+          Выйти из аккаунта
+        </button>
+      `;
     });
-    
-    async function resendVerification() {
-      try {
-        const user = auth.currentUser;
-        if (user) {
-          await user.sendEmailVerification({
-            url: window.location.origin + '/profile.html'
-          });
-          alert('✅ Письмо отправлено! Проверьте почту (включая папку Спам)');
-        }
-      } catch (error) {
-        alert('❌ Ошибка: ' + error.message);
-      }
-    }
     
     function logout() {
       auth.signOut()
@@ -87,7 +56,7 @@
           window.location.href = 'index.html';
         })
         .catch((error) => {
-          alert('Ошибка: ' + error.message);
+          alert('Ошибка при выходе: ' + error.message);
         });
     }
   </script>

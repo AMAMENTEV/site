@@ -53,44 +53,57 @@
           // Email подтвержден - переходим в профиль
           window.location.href = 'profile.html';
         } else {
-          // Email не подтвержден
+          // Email не подтвержден - показываем понятное сообщение
           messageDiv.innerHTML = `
             <div class="warning">
-              <p>⚠️ Email не подтвержден!</p>
-              <p>Пожалуйста, подтвердите ваш email, перейдя по ссылке в письме.</p>
-              <button onclick="resendVerification()" class="resend-btn">
-                Отправить письмо повторно
-              </button>
+              <strong>ⓘ Аккаунт не активирован</strong>
+              <p style="margin-top: 10px;">На почту <strong>${email}</strong> было отправлено письмо с подтверждением.</p>
+              <p>Пожалуйста, перейдите по ссылке в письме, чтобы активировать аккаунт.</p>
+              <p style="font-size: 0.9em; color: #666; margin-top: 10px;">
+                Не пришло письмо? Проверьте папку Спам или 
+                <a href="register.html">зарегистрируйтесь заново</a>
+              </p>
             </div>
           `;
           
           // Выходим из аккаунта
           await auth.signOut();
-          
-          loginBtn.disabled = false;
-          loginBtn.textContent = 'Войти';
         }
       } catch (error) {
         console.error(error);
         
-        let errorMessage = 'Неверный email или пароль';
+        let errorMessage = '';
+        let errorTitle = '';
+        
         if (error.code === 'auth/user-not-found') {
-          errorMessage = 'Пользователь с таким email не найден';
+          errorTitle = 'Аккаунт не существует';
+          errorMessage = 'Пользователь с таким email не зарегистрирован.';
         } else if (error.code === 'auth/wrong-password') {
-          errorMessage = 'Неверный пароль';
+          errorTitle = 'Неверный пароль';
+          errorMessage = 'Проверьте правильность ввода пароля.';
         } else if (error.code === 'auth/too-many-requests') {
-          errorMessage = 'Слишком много попыток. Попробуйте позже';
+          errorTitle = 'Слишком много попыток';
+          errorMessage = 'Попробуйте позже или восстановите пароль.';
+        } else {
+          errorTitle = 'Ошибка входа';
+          errorMessage = 'Проверьте правильность введенных данных.';
         }
         
-        messageDiv.innerHTML = `<div class="error">❌ ${errorMessage}</div>`;
+        messageDiv.innerHTML = `
+          <div class="error">
+            <strong>❌ ${errorTitle}</strong>
+            <p style="margin-top: 10px;">${errorMessage}</p>
+            <p style="margin-top: 15px; font-size: 0.9em;">
+              <a href="register.html">Зарегистрироваться</a> | 
+              <a href="#" onclick="location.reload()">Попробовать снова</a>
+            </p>
+          </div>
+        `;
+      } finally {
         loginBtn.disabled = false;
         loginBtn.textContent = 'Войти';
       }
     });
-    
-    window.resendVerification = async () => {
-      alert('Для повторной отправки письма, пожалуйста, зайдите на страницу регистрации и создайте аккаунт заново с тем же email');
-    };
   </script>
 </body>
 </html>
