@@ -42,18 +42,11 @@
     <div id="message" class="message"></div>
   </div>
 
+  <!-- Подключаем ТОЛЬКО firebase-config.js, он уже содержит инициализацию -->
+  <script src="firebase-config.js"></script>
   <script>
-    // Firebase config - ВСТАВЬТЕ СВОИ ДАННЫЕ
-    const firebaseConfig = {
-      apiKey: "ВАШ_API_KEY",
-      authDomain: "ВАШ_AUTH_DOMAIN",
-      projectId: "ВАШ_PROJECT_ID",
-      appId: "ВАШ_APP_ID"
-    };
-
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const db = firebase.firestore();
+    // НЕ НАДО заново инициализировать Firebase!
+    // auth и db уже есть из firebase-config.js
     
     document.getElementById('registerForm').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -80,7 +73,7 @@
           displayName: nickname + '|' + tag
         });
         
-        // 3. СОХРАНЯЕМ В FIRESTORE (это самый важный шаг)
+        // 3. СОХРАНЯЕМ В FIRESTORE
         await db.collection('users').doc(user.uid).set({
           nickname: nickname,
           tag: tag,
@@ -117,16 +110,8 @@
         registerBtn.disabled = false;
         registerBtn.textContent = 'Зарегистрироваться';
         
-        let errorMessage = 'Ошибка при регистрации';
-        if (error.code === 'auth/email-already-in-use') {
-          errorMessage = 'Этот email уже зарегистрирован';
-        } else if (error.code === 'auth/invalid-email') {
-          errorMessage = 'Некорректный email';
-        } else if (error.code === 'auth/weak-password') {
-          errorMessage = 'Пароль должен быть минимум 6 символов';
-        }
-        
-        messageDiv.innerHTML = `<div class="error">❌ ${errorMessage}</div>`;
+        // ПОКАЗЫВАЕМ РЕАЛЬНУЮ ОШИБКУ
+        messageDiv.innerHTML = `<div class="error">❌ ${error.message}</div>`;
       }
     });
   </script>
