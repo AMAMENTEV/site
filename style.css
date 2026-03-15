@@ -707,16 +707,21 @@ html, body {
 
   /* Кнопка "назад" видна только в мобильном чате */
   .mobile-back-btn {
-    display: inline-block;
     background: none;
-    border: none;
-    font-size: 1.8rem;
-    color: #3b82f6;
-    cursor: pointer;
-    padding: 0 10px 0 0;
-    line-height: 1;
-    width: auto;
-    flex-shrink: 0;
+  border: none;
+  font-size: 0.7rem; /* Увеличиваем размер стрелки */
+  color: #3b82f6;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  width: 52px; /* Фиксированная ширина, равна высоте аватарки */
+  height: 52px; /* Фиксированная высота, равна высоте аватарки */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  transition: background 0.2s;
+  flex-shrink: 0;
   }
 
   /* Синяя кнопка-бургер */
