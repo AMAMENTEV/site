@@ -7,90 +7,74 @@
   <link rel="stylesheet" href="style.css">
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
 </head>
 <body>
   <div class="container">
-    <h1>Профиль</h1>
-    
-    <div id="profileInfo" class="profile-info">
-      <div class="loading">Загрузка данных...</div>
+    <div id="profileContent">
+      <!-- Содержимое будет заполнено через JavaScript -->
     </div>
-    
-    <div id="emailVerification" class="verification-message" style="display: none;">
-      ⚠️ Ваш email не подтвержден. 
-      <button onclick="sendVerificationEmail()">Отправить письмо повторно</button>
-    </div>
-    
-    <button onclick="logout()" class="logout-btn">Выйти из аккаунта</button>
   </div>
 
   <script src="firebase-config.js"></script>
   <script>
-    // Функция для загрузки данных профиля
-    async function loadProfile(user) {
-      try {
-        // Получение дополнительных данных из Firestore
-        const doc = await db.collection('users').doc(user.uid).get();
-        
-        if (doc.exists) {
-          const userData = doc.data();
-          
-          // Обновляем информацию в профиле
-          document.getElementById('profileInfo').innerHTML = `
-            <div class="welcome-message">
-              <h2>Hello, ${userData.nickname} (${userData.tag})</h2>
-              <p>Email: ${userData.email} ${user.emailVerified ? '✓' : ''}</p>
-            </div>
-          `;
-        } else {
-          // Если данных нет в Firestore, используем данные из Auth
-          document.getElementById('profileInfo').innerHTML = `
-            <div class="welcome-message">
-              <h2>Hello, User</h2>
-              <p>Email: ${user.email}</p>
-            </div>
-          `;
-        }
-      } catch (error) {
-        console.error('Ошибка загрузки профиля:', error);
-        document.getElementById('profileInfo').innerHTML = `
-          <div class="error">Ошибка загрузки данных</div>
-        `;
-      }
-    }
-
-    // Проверка состояния аутентификации
-    auth.onAuthStateChanged(async (user) => {
+    // Проверяем авторизацию
+    auth.onAuthStateChanged((user) => {
+      const profileContent = document.getElementById('profileContent');
+      
       if (user) {
-        // Пользователь вошел в систему
-        
-        // Проверка подтверждения email
         if (user.emailVerified) {
-          document.getElementById('emailVerification').style.display = 'none';
-          await loadProfile(user);
+          // Email подтвержден - показываем приветствие
+          const displayName = user.displayName || 'User';
+          
+          // Парсим ник и тег из displayName
+          let nickname = displayName;
+          let tag = '';
+          
+          const match = displayName.match(/(.+) \((@.+)\)/);
+          if (match) {
+            nickname = match[1];
+            tag = match[2];
+          }
+          
+          profileContent.innerHTML = `
+            <h1>Профиль</h1>
+            <div class="welcome-message">
+              <h2>Hello, ${nickname} ${tag ? '(' + tag + ')' : ''}</h2>
+              <p>Email: ${user.email} ✓</p>
+            </div>
+            <button onclick="logout()" class="logout-btn">Выйти из аккаунта</button>
+          `;
         } else {
-          document.getElementById('emailVerification').style.display = 'block';
-          document.getElementById('profileInfo').innerHTML = `
-            <div class="info-message">
-              <p>Пожалуйста, подтвердите ваш email, чтобы увидеть профиль</p>
+          // Email не подтвержден
+          profileContent.innerHTML = `
+            <h1>Подтверждение email</h1>
+            <div class="warning">
+              <h2>⚠️ Email не подтвержден</h2>
+              <p>На почту <strong>${user.email}</strong> было отправлено письмо с подтверждением.</p>
+              <p>Пожалуйста, перейдите по ссылке в письме, чтобы активировать аккаунт.</p>
+              <button onclick="resendVerification()" class="resend-btn">
+                Отправить письмо повторно
+              </button>
+              <button onclick="logout()" class="logout-btn" style="margin-top: 1rem; background-color: #666;">
+                Выйти
+              </button>
             </div>
           `;
         }
       } else {
-        // Пользователь не вошел - перенаправляем на страницу входа
+        // Не авторизован
         window.location.href = 'index.html';
       }
     });
     
-    async function sendVerificationEmail() {
+    async function resendVerification() {
       try {
         const user = auth.currentUser;
         if (user) {
           await user.sendEmailVerification({
             url: window.location.origin + '/profile.html'
           });
-          alert('✅ Письмо для подтверждения отправлено! Проверьте вашу почту.');
+          alert('✅ Письмо отправлено! Проверьте почту (включая папку Спам)');
         }
       } catch (error) {
         alert('❌ Ошибка: ' + error.message);
@@ -103,7 +87,7 @@
           window.location.href = 'index.html';
         })
         .catch((error) => {
-          alert('Ошибка при выходе: ' + error.message);
+          alert('Ошибка: ' + error.message);
         });
     }
   </script>

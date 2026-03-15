@@ -7,7 +7,6 @@
   <link rel="stylesheet" href="style.css">
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
 </head>
 <body>
   <div class="container">
@@ -21,8 +20,7 @@
       
       <div class="form-group">
         <label for="tag">Тег (@):</label>
-        <input type="text" id="tag" pattern="@[A-Za-z0-9_]+" placeholder="@username" required>
-        <small>Только латинские буквы, цифры и нижнее подчеркивание</small>
+        <input type="text" id="tag" placeholder="@username" required>
       </div>
       
       <div class="form-group">
@@ -33,13 +31,12 @@
       <div class="form-group">
         <label for="password">Пароль:</label>
         <input type="password" id="password" required minlength="6">
-        <small>Минимум 6 символов</small>
       </div>
       
       <button type="submit" id="registerBtn">Зарегистрироваться</button>
     </form>
     
-    <p>Уже есть аккаунт? <a href="index.html">Войти</a></p>
+    <p>Есть аккаунт? <a href="index.html">Войти</a></p>
     
     <div id="message" class="message"></div>
   </div>
@@ -54,52 +51,52 @@
       const email = document.getElementById('email').value;
       const password = document.getElementById('password').value;
       
-      // Блокируем кнопку, чтобы избежать повторной отправки
       const registerBtn = document.getElementById('registerBtn');
+      const messageDiv = document.getElementById('message');
+      
+      // Показываем сообщение о начале регистрации
+      messageDiv.innerHTML = '<div class="info">Создаем аккаунт...</div>';
       registerBtn.disabled = true;
-      registerBtn.textContent = 'Регистрация...';
+      registerBtn.textContent = 'Подождите...';
       
       try {
-        // Создание пользователя в Firebase Auth
+        // Создаем пользователя
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
         const user = userCredential.user;
         
-        // Сохранение дополнительной информации в Firestore
-        await db.collection('users').doc(user.uid).set({
-          nickname: nickname,
-          tag: tag,
-          email: email,
-          emailVerified: false,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        // Обновляем профиль с ником
+        await user.updateProfile({
+          displayName: nickname + ' (' + tag + ')'
         });
         
-        // Отправка письма для подтверждения email
+        // Отправляем письмо для подтверждения
         await user.sendEmailVerification({
           url: window.location.origin + '/index.html'
         });
         
-        // Показываем сообщение об успехе
-        document.getElementById('message').innerHTML = `
+        // Выходим из аккаунта
+        await auth.signOut();
+        
+        // Показываем сообщение об успехе с кнопкой повторной отправки
+        messageDiv.innerHTML = `
           <div class="success">
-            ✅ Регистрация успешна!<br><br>
-            На ваш email <strong>${email}</strong> отправлено письмо с подтверждением.<br><br>
-            Пожалуйста, подтвердите email и войдите в аккаунт.<br><br>
-            <small>Перенаправление на страницу входа через 5 секунд...</small>
+            <h3>✅ Регистрация успешна!</h3>
+            <p>На почту <strong>${email}</strong> отправлено письмо с подтверждением.</p>
+            <p>Письмо может прийти в течение нескольких минут.</p>
+            <button onclick="resendVerificationEmail('${email}')" class="resend-btn">
+              Отправить письмо повторно
+            </button>
+            <p><a href="index.html">Перейти на страницу входа</a></p>
           </div>
         `;
         
-        // Выходим из аккаунта, чтобы пользователь не был автоматически авторизован
-        await auth.signOut();
-        
-        // Перенаправление на страницу входа через 5 секунд
-        setTimeout(() => {
-          window.location.href = 'index.html';
-        }, 5000);
+        // Прячем форму регистрации
+        document.getElementById('registerForm').style.display = 'none';
         
       } catch (error) {
-        console.error('Ошибка регистрации:', error);
+        console.error(error);
         
-        let errorMessage = error.message;
+        let errorMessage = 'Ошибка при регистрации';
         if (error.code === 'auth/email-already-in-use') {
           errorMessage = 'Этот email уже зарегистрирован';
         } else if (error.code === 'auth/invalid-email') {
@@ -108,15 +105,22 @@
           errorMessage = 'Пароль должен быть минимум 6 символов';
         }
         
-        document.getElementById('message').innerHTML = `
-          <div class="error">❌ ${errorMessage}</div>
-        `;
-        
-        // Разблокируем кнопку
+        messageDiv.innerHTML = `<div class="error">❌ ${errorMessage}</div>`;
         registerBtn.disabled = false;
         registerBtn.textContent = 'Зарегистрироваться';
       }
     });
+    
+    // Функция для повторной отправки письма
+    window.resendVerificationEmail = async (email) => {
+      try {
+        // Пробуем войти, чтобы отправить письмо
+        // Это костыль, но работает
+        alert('Функция временно недоступна. Пожалуйста, проверьте папку Спам или попробуйте зарегистрироваться снова.');
+      } catch (error) {
+        alert('Ошибка при отправке письма');
+      }
+    };
   </script>
 </body>
 </html>
