@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
   <title>Мессенджер</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
@@ -21,7 +21,7 @@
     </div>
     
     <!-- Вторая колонка - список пользователей -->
-    <div class="users-sidebar">
+    <div class="users-sidebar" id="usersSidebar">
       <div class="users-header">
         <h2>Пользователи</h2>
         <p>Выберите кому написать</p>
@@ -66,7 +66,10 @@
     let unsubscribeMessages = null;
     let allUsers = [];
     
+    // Проверка авторизации
     auth.onAuthStateChanged(async (user) => {
+      console.log('Auth state:', user ? user.email : 'no user');
+      
       if (!user || !user.emailVerified) {
         window.location.href = 'index.html';
         return;
@@ -74,20 +77,27 @@
       
       currentUser = user;
       
-      const userDoc = await db.collection('users').doc(user.uid).get();
-      if (userDoc.exists) {
-        currentUserData = userDoc.data();
+      // Получаем данные текущего пользователя
+      try {
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        if (userDoc.exists) {
+          currentUserData = userDoc.data();
+        }
+      } catch (error) {
+        console.error('Ошибка загрузки пользователя:', error);
       }
       
       loadUsers();
     });
     
+    // Загрузка списка пользователей
     async function loadUsers() {
       const usersList = document.getElementById('usersList');
       usersList.innerHTML = '<div class="loading">Загрузка пользователей...</div>';
       
       try {
         const snapshot = await db.collection('users').get();
+        console.log('Загружено пользователей:', snapshot.size);
         
         allUsers = [];
         
@@ -100,6 +110,8 @@
           }
         });
         
+        console.log('Пользователей кроме текущего:', allUsers.length);
+        
         if (allUsers.length === 0) {
           usersList.innerHTML = '<div class="no-users">Пока нет других пользователей</div>';
         } else {
@@ -107,6 +119,7 @@
         }
         
       } catch (error) {
+        console.error('Ошибка загрузки:', error);
         usersList.innerHTML = '<div class="error">Ошибка загрузки пользователей</div>';
       }
     }
@@ -150,6 +163,8 @@
     }
     
     function selectUser(userId, nickname, tag) {
+      console.log('Выбран пользователь:', userId, nickname);
+      
       selectedUser = { id: userId, nickname, tag };
       
       document.getElementById('chatHeader').innerHTML = `
@@ -163,6 +178,12 @@
       `;
       
       document.getElementById('messageInputArea').style.display = 'flex';
+      
+      // На мобильных устройствах после выбора пользователя скрываем сайдбар
+      if (window.innerWidth <= 768) {
+        toggleSidebar();
+      }
+      
       createOrGetChat();
     }
     
@@ -187,6 +208,7 @@
         
         if (chatId) {
           currentChatId = chatId;
+          console.log('Чат найден:', chatId);
         } else {
           const newChat = await db.collection('chats').add({
             participants: [currentUser.uid, selectedUser.id],
@@ -195,6 +217,7 @@
             lastMessageTime: null
           });
           currentChatId = newChat.id;
+          console.log('Чат создан:', currentChatId);
         }
         
         loadMessages();
@@ -234,6 +257,8 @@
           
           messagesContainer.innerHTML = messagesHTML;
           messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }, (error) => {
+          console.error('Ошибка загрузки сообщений:', error);
         });
     }
     
@@ -241,7 +266,10 @@
       const input = document.getElementById('messageInput');
       const text = input.value.trim();
       
-      if (!text || !currentChatId) return;
+      if (!text || !currentChatId || !selectedUser) {
+        console.log('Невозможно отправить:', {text, currentChatId, selectedUser});
+        return;
+      }
       
       // Очищаем поле сразу
       input.value = '';
@@ -275,13 +303,17 @@
           window.location.href = 'index.html';
         })
         .catch((error) => {
+          console.error('Ошибка при выходе:', error);
           alert('Ошибка при выходе из аккаунта');
         });
     }
     
     function toggleSidebar() {
-      document.querySelector('.users-sidebar').classList.toggle('active');
-      document.querySelector('.sidebar-overlay').classList.toggle('active');
+      const sidebar = document.getElementById('usersSidebar');
+      const overlay = document.querySelector('.sidebar-overlay');
+      
+      sidebar.classList.toggle('active');
+      overlay.classList.toggle('active');
     }
   </script>
 </body>
