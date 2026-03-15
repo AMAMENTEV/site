@@ -11,23 +11,19 @@
 </head>
 <body>
   <!-- Верхняя панель с кнопками -->
-  <div class="top-nav">
-    <div class="nav-left">
-      <h2>Пользователи</h2>
+  <div class="top-bar">
+    <div class="top-bar-left">
+      <h1>Пользователи</h1>
     </div>
-    <div class="nav-right">
-      <a href="profile.html" class="nav-profile-btn">Мой профиль</a>
-      <button onclick="logout()" class="nav-logout-btn">Выйти</button>
+    <div class="top-bar-right">
+      <a href="profile.html" class="top-bar-btn profile">Мой профиль</a>
+      <button onclick="logout()" class="top-bar-btn logout">Выйти</button>
     </div>
   </div>
 
   <div class="messenger-container">
     <!-- Левая панель - список пользователей -->
     <div class="users-sidebar">
-      <div class="current-user-profile" id="currentUserProfile">
-        <!-- Данные текущего пользователя -->
-      </div>
-      
       <div class="search-box">
         <input type="text" id="searchInput" placeholder="Поиск по нику или тегу..." onkeyup="searchUsers()">
       </div>
@@ -49,7 +45,7 @@
       
       <div class="message-input-area" id="messageInputArea" style="display: none;">
         <input type="text" id="messageInput" placeholder="Введите сообщение..." onkeypress="if(event.key==='Enter') sendMessage()">
-        <button onclick="sendMessage()">→</button>
+        <button onclick="sendMessage()" id="sendButton">→</button>
       </div>
     </div>
   </div>
@@ -66,6 +62,7 @@
     let currentChatId = null;
     let unsubscribeMessages = null;
     let allUsers = [];
+    let pendingMessages = new Map(); // Для временных сообщений
     
     auth.onAuthStateChanged(async (user) => {
       if (!user || !user.emailVerified) {
@@ -75,28 +72,13 @@
       
       currentUser = user;
       
-      // Получаем данные текущего пользователя
       const userDoc = await db.collection('users').doc(user.uid).get();
       if (userDoc.exists) {
         currentUserData = userDoc.data();
-        displayCurrentUser();
       }
       
       loadUsers();
     });
-    
-    function displayCurrentUser() {
-      const profileDiv = document.getElementById('currentUserProfile');
-      const firstLetter = currentUserData.nickname ? currentUserData.nickname.charAt(0).toUpperCase() : '?';
-      
-      profileDiv.innerHTML = `
-        <div class="user-avatar-placeholder" style="width: 48px; height: 48px;">${firstLetter}</div>
-        <div class="user-info">
-          <div class="user-name">${currentUserData.nickname || 'Пользователь'}</div>
-          <div class="user-tag">${currentUserData.tag || ''}</div>
-        </div>
-      `;
-    }
     
     async function loadUsers() {
       const usersList = document.getElementById('usersList');
@@ -229,21 +211,42 @@
         .collection('messages')
         .orderBy('timestamp', 'asc')
         .onSnapshot((snapshot) => {
-          if (snapshot.empty) {
+          // Объединяем реальные сообщения с ожидающими
+          const realMessages = [];
+          snapshot.forEach(doc => {
+            const msg = doc.data();
+            realMessages.push({
+              id: doc.id,
+              ...msg,
+              timestamp: msg.timestamp?.toDate() || new Date()
+            });
+          });
+          
+          // Добавляем ожидающие сообщения
+          const pendingForThisChat = Array.from(pendingMessages.values())
+            .filter(msg => msg.chatId === currentChatId && msg.status === 'pending');
+          
+          const allMessages = [...realMessages, ...pendingForThisChat]
+            .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+          
+          if (allMessages.length === 0) {
             messagesContainer.innerHTML = '<div class="no-messages">Нет сообщений. Напишите что-нибудь!</div>';
             return;
           }
           
           let messagesHTML = '';
-          snapshot.forEach(doc => {
-            const msg = doc.data();
+          allMessages.forEach(msg => {
             const isMyMessage = msg.senderId === currentUser.uid;
-            const time = msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
+            const time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
+            const statusClass = msg.status === 'pending' ? 'pending' : (msg.status === 'error' ? 'error' : '');
             
             messagesHTML += `
-              <div class="message ${isMyMessage ? 'my-message' : 'other-message'}">
+              <div class="message ${isMyMessage ? 'my-message' : 'other-message'} ${statusClass}">
                 <div class="message-content">${msg.text}</div>
-                <div class="message-time">${time}</div>
+                <div class="message-time">
+                  ${time}
+                  ${msg.status === 'pending' ? '<span class="loading-indicator"></span>' : ''}
+                </div>
               </div>
             `;
           });
@@ -256,11 +259,35 @@
     async function sendMessage() {
       const input = document.getElementById('messageInput');
       const text = input.value.trim();
+      const sendButton = document.getElementById('sendButton');
       
       if (!text || !currentChatId) return;
       
+      // Очищаем поле сразу
+      input.value = '';
+      
+      // Создаем временное сообщение
+      const tempId = 'temp_' + Date.now();
+      const tempMessage = {
+        id: tempId,
+        text: text,
+        senderId: currentUser.uid,
+        receiverId: selectedUser.id,
+        timestamp: new Date(),
+        status: 'pending',
+        chatId: currentChatId
+      };
+      
+      // Добавляем в ожидающие
+      pendingMessages.set(tempId, tempMessage);
+      
+      // Обновляем отображение
+      const messagesContainer = document.getElementById('messagesContainer');
+      // Триггерим обновление через snapshot
+      
       try {
-        await db.collection('chats').doc(currentChatId)
+        // Отправляем в Firebase
+        const docRef = await db.collection('chats').doc(currentChatId)
           .collection('messages')
           .add({
             text: text,
@@ -274,8 +301,17 @@
           lastMessageTime: firebase.firestore.FieldValue.serverTimestamp()
         });
         
-        input.value = '';
+        // Удаляем из ожидающих после успешной отправки
+        pendingMessages.delete(tempId);
+        
       } catch (error) {
+        console.error('Ошибка отправки:', error);
+        
+        // Помечаем сообщение как ошибочное
+        if (pendingMessages.has(tempId)) {
+          pendingMessages.get(tempId).status = 'error';
+        }
+        
         alert('Ошибка при отправке сообщения');
       }
     }
