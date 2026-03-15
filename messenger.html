@@ -21,6 +21,11 @@
         </div>
       </div>
       
+      <!-- Профиль текущего пользователя в левой панели -->
+      <div id="currentUserProfile" class="current-user-profile">
+        <!-- Будет заполнено через JS -->
+      </div>
+      
       <div class="search-box">
         <input type="text" id="searchInput" placeholder="Поиск по нику или тегу..." onkeyup="searchUsers()">
       </div>
@@ -54,6 +59,7 @@
   <script src="firebase-config.js"></script>
   <script>
     let currentUser = null;
+    let currentUserData = null;
     let selectedUser = null;
     let currentChatId = null;
     let unsubscribeMessages = null;
@@ -69,8 +75,30 @@
       }
       
       currentUser = user;
+      
+      // Получаем данные текущего пользователя
+      const userDoc = await db.collection('users').doc(user.uid).get();
+      if (userDoc.exists) {
+        currentUserData = userDoc.data();
+        displayCurrentUser();
+      }
+      
       loadUsers();
     });
+    
+    // Отображение текущего пользователя в левой панели
+    function displayCurrentUser() {
+      const profileDiv = document.getElementById('currentUserProfile');
+      const firstLetter = currentUserData.nickname ? currentUserData.nickname.charAt(0).toUpperCase() : '?';
+      
+      profileDiv.innerHTML = `
+        <div class="current-user-avatar">${firstLetter}</div>
+        <div class="current-user-info">
+          <h3>${currentUserData.nickname || 'Пользователь'}</h3>
+          <p>${currentUserData.tag || ''}</p>
+        </div>
+      `;
+    }
     
     // Загрузка списка пользователей
     async function loadUsers() {
@@ -219,28 +247,12 @@
             const isMyMessage = msg.senderId === currentUser.uid;
             const time = msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
             
-            // Для сообщений других пользователей показываем аватар
-            if (isMyMessage) {
-              messagesHTML += `
-                <div class="message-wrapper my-message">
-                  <div class="message-bubble">
-                    <p>${msg.text}</p>
-                    <div class="message-time">${time}</div>
-                  </div>
-                  <div class="message-avatar">${currentUser.displayName?.charAt(0) || 'Я'}</div>
-                </div>
-              `;
-            } else {
-              messagesHTML += `
-                <div class="message-wrapper">
-                  <div class="message-avatar">${selectedUser.nickname.charAt(0).toUpperCase()}</div>
-                  <div class="message-bubble">
-                    <p>${msg.text}</p>
-                    <div class="message-time">${time}</div>
-                  </div>
-                </div>
-              `;
-            }
+            messagesHTML += `
+              <div class="message ${isMyMessage ? 'my-message' : 'other-message'}">
+                <div class="message-content">${msg.text}</div>
+                <div class="message-time">${time}</div>
+              </div>
+            `;
           });
           
           messagesContainer.innerHTML = messagesHTML;
