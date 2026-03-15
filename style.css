@@ -809,3 +809,39 @@ html, body {
     display: none !important;
   }
 }
+
+/* Центрирование уведомлений на страницах авторизации */
+.auth-card .success,
+.auth-card .error,
+.auth-card .warning,
+.auth-card .info {
+  width: 100%;
+  text-align: center;
+  margin-left: auto;
+  margin-right: auto;
+  box-sizing: border-box;
+}
+
+/* Для ссылки внутри уведомления */
+.auth-card .success a {
+  display: inline-block;
+  margin-top: 10px;
+  color: #667eea;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.auth-card .success a:hover {
+  text-decoration: underline;
+}
+
+/* Убедимся, что карточка правильно центрирует содержимое */
+.auth-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.auth-card > * {
+  width: 100%;
+}
