@@ -661,33 +661,218 @@ body {
   display: none;
 }
 
-/* ========== МОБИЛЬНАЯ ВЕРСИЯ ========== */
+/* ========== МОБИЛЬНАЯ ВЕРСИЯ ПОЛНОСТЬЮ ========== */
 @media (max-width: 768px) {
+  /* Убираем нав панель на мобилках */
   .nav-sidebar {
-    display: none; /* На мобилках убираем нав панель, кнопки будут в другом месте */
+    display: none;
   }
   
+  /* Переделываем структуру для мобилок */
+  .messenger-container {
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+  }
+  
+  /* Левая панель на мобилках - скрыта по умолчанию */
   .users-sidebar {
+    position: fixed;
+    top: 0;
+    left: -100%;
     width: 85%;
     max-width: 320px;
-    position: fixed;
-    left: -100%;
-    top: 0;
-    bottom: 0;
+    height: 100vh;
+    background: white;
     z-index: 1000;
     transition: left 0.3s ease;
-    background: white;
-    box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+    box-shadow: 2px 0 20px rgba(0,0,0,0.1);
+    display: flex !important;
+    flex-direction: column;
+    border-right: 1px solid #eef2f6;
   }
   
   .users-sidebar.active {
     left: 0;
   }
   
-  .chat-area {
-    width: 100%;
+  /* Контент сайдбара */
+  .users-sidebar .users-header {
+    padding: 20px 16px;
+    border-bottom: 1px solid #eef2f6;
   }
   
+  .users-sidebar .users-header h2 {
+    font-size: 1.2rem;
+    margin-bottom: 4px;
+  }
+  
+  .users-sidebar .search-box {
+    padding: 12px 16px;
+  }
+  
+  .users-sidebar .users-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+  }
+  
+  /* Элементы пользователей ДОЛЖНЫ быть кликабельными */
+  .users-sidebar .user-item {
+    display: flex;
+    align-items: center;
+    padding: 12px;
+    border-radius: 12px;
+    margin-bottom: 4px;
+    cursor: pointer;
+    background: white;
+    transition: background 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  .users-sidebar .user-item:active {
+    background: #f1f5f9;
+  }
+  
+  .users-sidebar .user-avatar-placeholder {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: #3b82f6;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-right: 12px;
+    flex-shrink: 0;
+  }
+  
+  .users-sidebar .user-info {
+    flex: 1;
+  }
+  
+  .users-sidebar .user-name {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: #0f172a;
+    margin-bottom: 2px;
+  }
+  
+  .users-sidebar .user-tag {
+    font-size: 0.8rem;
+    color: #64748b;
+  }
+  
+  /* Чат на мобилках занимает весь экран */
+  .chat-area {
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .chat-header {
+    padding: 16px;
+    border-bottom: 1px solid #eef2f6;
+    background: white;
+    flex-shrink: 0;
+  }
+  
+  .selected-user {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  
+  .chat-user-avatar-placeholder {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: #3b82f6;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+  
+  .messages-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    background: #fafbff;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .message {
+    max-width: 85%;
+    padding: 10px 14px;
+    border-radius: 16px;
+    font-size: 0.9rem;
+  }
+  
+  .message.my-message {
+    align-self: flex-end;
+    background: #3b82f6;
+    color: white;
+    border-bottom-right-radius: 4px;
+  }
+  
+  .message.other-message {
+    align-self: flex-start;
+    background: white;
+    color: #1e293b;
+    border: 1px solid #eef2f6;
+    border-bottom-left-radius: 4px;
+  }
+  
+  .message-time {
+    font-size: 0.65rem;
+    margin-top: 4px;
+    opacity: 0.7;
+    text-align: right;
+  }
+  
+  .message-input-area {
+    padding: 12px 16px;
+    border-top: 1px solid #eef2f6;
+    background: white;
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  
+  .message-input-area input {
+    flex: 1;
+    padding: 12px 16px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 25px;
+    font-size: 0.95rem;
+  }
+  
+  .message-input-area button {
+    width: 48px;
+    height: 48px;
+    border-radius: 25px;
+    background: #3b82f6;
+    color: white;
+    border: none;
+    cursor: pointer;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  
+  /* Кнопка открытия меню */
   .mobile-menu-btn {
     display: flex;
     position: fixed;
@@ -705,8 +890,14 @@ body {
     font-size: 1.5rem;
     box-shadow: 0 4px 12px rgba(59,130,246,0.4);
     z-index: 1001;
+    -webkit-tap-highlight-color: transparent;
   }
   
+  .mobile-menu-btn:active {
+    transform: scale(0.95);
+  }
+  
+  /* Оверлей */
   .sidebar-overlay {
     display: none;
     position: fixed;
@@ -722,24 +913,23 @@ body {
     display: block;
   }
   
-  /* Адаптация сообщений для мобилок */
-  .message {
-    max-width: 85%;
+  /* Сообщение "Выберите пользователя" */
+  .no-chat-selected {
+    text-align: center;
+    color: #94a3b8;
+    padding: 40px 20px;
+    font-size: 0.95rem;
   }
   
-  .chat-header {
-    padding: 16px;
-  }
-  
-  .messages-container {
-    padding: 16px;
-  }
-  
-  .message-input-area {
-    padding: 12px 16px;
+  /* Убираем десктопные лишние элементы */
+  .no-messages, .loading, .no-users {
+    text-align: center;
+    color: #94a3b8;
+    padding: 40px 20px;
   }
 }
 
+/* Кнопка меню скрыта на десктопе */
 .mobile-menu-btn {
-  display: none; /* По умолчанию скрыта, показывается только на мобилках */
+  display: none;
 }
