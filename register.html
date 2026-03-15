@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="style.css">
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
 </head>
 <body>
   <div class="container">
@@ -41,9 +42,18 @@
     <div id="message" class="message"></div>
   </div>
 
-  <script src="firebase-config.js"></script>
   <script>
-    let lastEmail = '';
+    // Firebase config - ВСТАВЬТЕ СВОИ ДАННЫЕ
+    const firebaseConfig = {
+      apiKey: "ВАШ_API_KEY",
+      authDomain: "ВАШ_AUTH_DOMAIN",
+      projectId: "ВАШ_PROJECT_ID",
+      appId: "ВАШ_APP_ID"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
     
     document.getElementById('registerForm').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -52,7 +62,6 @@
       const tag = document.getElementById('tag').value;
       const email = document.getElementById('email').value;
       const password = document.getElementById('password').value;
-      lastEmail = email;
       
       const registerBtn = document.getElementById('registerBtn');
       const messageDiv = document.getElementById('message');
@@ -62,30 +71,37 @@
       messageDiv.innerHTML = '<div class="info">Создаем аккаунт...</div>';
       
       try {
-        // Создаем пользователя
+        // 1. Создаем пользователя в Auth
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
         const user = userCredential.user;
         
-        // Сохраняем ник и тег
+        // 2. Сохраняем ник и тег в Auth
         await user.updateProfile({
           displayName: nickname + '|' + tag
         });
         
-        // Отправляем письмо
+        // 3. СОХРАНЯЕМ В FIRESTORE (это самый важный шаг)
+        await db.collection('users').doc(user.uid).set({
+          nickname: nickname,
+          tag: tag,
+          email: email,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        console.log('Пользователь сохранен в Firestore:', user.uid);
+        
+        // 4. Отправляем письмо
         await user.sendEmailVerification();
         
-        // Выходим из аккаунта
+        // 5. Выходим из аккаунта
         await auth.signOut();
         
-        // Показываем сообщение с кнопкой повторной отправки
+        // 6. Показываем сообщение
         messageDiv.innerHTML = `
           <div class="success">
             <h3>✅ Регистрация успешна!</h3>
             <p>На почту <strong>${email}</strong> отправлено письмо с подтверждением.</p>
-            <p>Письмо может прийти в течение нескольких минут. Проверьте папку Спам.</p>
-            <button onclick="resendVerification()" class="resend-btn">
-              📧 Отправить письмо повторно
-            </button>
+            <p>Проверьте папку Спам.</p>
             <p style="margin-top: 20px;">
               <a href="index.html">Перейти на страницу входа</a>
             </p>
@@ -96,12 +112,14 @@
         document.getElementById('registerForm').style.display = 'none';
         
       } catch (error) {
+        console.error('Ошибка регистрации:', error);
+        
         registerBtn.disabled = false;
         registerBtn.textContent = 'Зарегистрироваться';
         
         let errorMessage = 'Ошибка при регистрации';
         if (error.code === 'auth/email-already-in-use') {
-          errorMessage = 'Этот email уже зарегистрирован. <a href="index.html">Войти?</a>';
+          errorMessage = 'Этот email уже зарегистрирован';
         } else if (error.code === 'auth/invalid-email') {
           errorMessage = 'Некорректный email';
         } else if (error.code === 'auth/weak-password') {
@@ -111,32 +129,6 @@
         messageDiv.innerHTML = `<div class="error">❌ ${errorMessage}</div>`;
       }
     });
-    
-    // Функция повторной отправки письма
-    window.resendVerification = async function() {
-      const btn = event.target;
-      const originalText = btn.textContent;
-      
-      btn.disabled = true;
-      btn.textContent = 'Отправка...';
-      
-      try {
-        // Пробуем войти, чтобы отправить письмо повторно
-        // Это костыль, но работает для повторной отправки
-        const result = await auth.signInWithEmailAndPassword(lastEmail, '');
-        // Не получится, но это не важно - мы просто хотим отправить письмо
-      } catch (error) {
-        // Игнорируем ошибку входа
-      }
-      
-      // Показываем сообщение об отправке
-      const messageDiv = document.getElementById('message');
-      messageDiv.innerHTML = messageDiv.innerHTML + 
-        '<div class="info" style="margin-top: 10px;">Письмо отправлено! Проверьте почту.</div>';
-      
-      btn.disabled = false;
-      btn.textContent = originalText;
-    };
   </script>
 </body>
 </html>

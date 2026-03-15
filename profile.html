@@ -17,14 +17,15 @@
     </div>
     
     <div id="profileContent" class="profile-page">
-      <!-- Содержимое будет заполнено -->
+      <div class="loading">Загрузка профиля...</div>
     </div>
   </div>
 
   <script src="firebase-config.js"></script>
   <script>
-    // Загрузка профиля
     auth.onAuthStateChanged(async (user) => {
+      console.log('Profile page - auth state:', user ? user.email : 'no user');
+      
       if (!user || !user.emailVerified) {
         window.location.href = 'index.html';
         return;
@@ -37,11 +38,32 @@
         const userDoc = await db.collection('users').doc(user.uid).get();
         
         if (!userDoc.exists) {
-          profileContent.innerHTML = '<div class="error">Профиль не найден</div>';
+          console.log('Профиль не найден в Firestore, создаем...');
+          
+          // Если профиля нет, создаем его из данных Auth
+          let nickname = 'Пользователь';
+          let tag = '';
+          
+          if (user.displayName) {
+            const parts = user.displayName.split('|');
+            nickname = parts[0] || 'Пользователь';
+            tag = parts[1] || '';
+          }
+          
+          await db.collection('users').doc(user.uid).set({
+            nickname: nickname,
+            tag: tag,
+            email: user.email,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          
+          console.log('Профиль создан');
+          window.location.reload();
           return;
         }
         
         const userData = userDoc.data();
+        console.log('Данные профиля:', userData);
         
         profileContent.innerHTML = `
           <h1>Мой профиль</h1>
@@ -79,7 +101,7 @@
         `;
         
       } catch (error) {
-        console.error('Ошибка загрузки профиля:', error);
+        console.error('❌ Ошибка загрузки профиля:', error);
         profileContent.innerHTML = '<div class="error">Ошибка загрузки профиля</div>';
       }
     });
@@ -89,7 +111,7 @@
     function editNickname() {
       const span = document.getElementById('nickname');
       const current = span.textContent;
-      span.innerHTML = `<input type="text" id="editNickname" value="${current}">`;
+      span.innerHTML = `<input type="text" id="editNickname" value="${current}" class="edit-input">`;
       changes.nickname = true;
       document.getElementById('saveBtn').style.display = 'block';
     }
@@ -97,7 +119,7 @@
     function editTag() {
       const span = document.getElementById('tag');
       const current = span.textContent;
-      span.innerHTML = `<input type="text" id="editTag" value="${current}" placeholder="@tag">`;
+      span.innerHTML = `<input type="text" id="editTag" value="${current}" placeholder="@tag" class="edit-input">`;
       changes.tag = true;
       document.getElementById('saveBtn').style.display = 'block';
     }
@@ -117,13 +139,9 @@
       }
       
       try {
-        // Обновляем в Firestore
         await db.collection('users').doc(user.uid).update(updates);
         
-        // Обновляем displayName в Auth
-        const currentUserDoc = await db.collection('users').doc(user.uid).get();
-        const currentData = currentUserDoc.data();
-        const newDisplayName = `${currentData.nickname}|${currentData.tag}`;
+        const newDisplayName = `${updates.nickname || document.getElementById('nickname').textContent}|${updates.tag || document.getElementById('tag').textContent}`;
         await user.updateProfile({
           displayName: newDisplayName
         });

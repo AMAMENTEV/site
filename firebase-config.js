@@ -15,47 +15,33 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-// ВАЖНО: включаем постоянное сохранение сессии
+// Включаем постоянное сохранение сессии
 auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
   .then(() => {
-    console.log('Сохранение сессии включено');
+    console.log('✅ Сессия будет сохраняться');
   })
   .catch((error) => {
-    console.log('Ошибка настройки сохранения:', error);
+    console.log('❌ Ошибка настройки сессии:', error);
   });
 
-// Создаем коллекцию пользователей в Firestore при первом входе
-auth.onAuthStateChanged(async (user) => {
+// Проверка авторизации (простая версия)
+auth.onAuthStateChanged((user) => {
+  const currentPage = window.location.pathname.split('/').pop() || 'index.html';
+  
   if (user && user.emailVerified) {
-    console.log('Пользователь авторизован:', user.email);
-    
-    // Проверяем, есть ли пользователь в Firestore
-    const userDoc = await db.collection('users').doc(user.uid).get();
-    
-    if (!userDoc.exists) {
-      // Парсим ник и тег из displayName (формат: "никнейм|@тег")
-      let nickname = 'Пользователь';
-      let tag = '';
-      
-      if (user.displayName) {
-        const parts = user.displayName.split('|');
-        nickname = parts[0] || 'Пользователь';
-        tag = parts[1] || '';
-      }
-      
-      // Создаем документ пользователя
-      await db.collection('users').doc(user.uid).set({
-        nickname: nickname,
-        tag: tag,
-        email: user.email,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      });
-      
-      console.log('Профиль пользователя создан в Firestore');
+    console.log('✅ Пользователь авторизован:', user.email);
+    if (currentPage === 'index.html' || currentPage === 'register.html') {
+      window.location.href = 'messenger.html';
     }
   } else if (user && !user.emailVerified) {
-    console.log('Email не подтвержден');
+    console.log('⏳ Email не подтвержден');
+    if (currentPage === 'messenger.html' || currentPage === 'profile.html') {
+      window.location.href = 'index.html';
+    }
   } else {
-    console.log('Пользователь не авторизован');
+    console.log('❌ Пользователь не авторизован');
+    if (currentPage === 'messenger.html' || currentPage === 'profile.html') {
+      window.location.href = 'index.html';
+    }
   }
 });

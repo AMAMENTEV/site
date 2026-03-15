@@ -59,12 +59,7 @@
     auth.onAuthStateChanged(async (user) => {
       console.log('Auth state changed:', user ? user.email : 'no user');
       
-      if (!user) {
-        window.location.href = 'index.html';
-        return;
-      }
-      
-      if (!user.emailVerified) {
+      if (!user || !user.emailVerified) {
         window.location.href = 'index.html';
         return;
       }
@@ -79,14 +74,16 @@
       usersList.innerHTML = '<div class="loading">Загрузка пользователей...</div>';
       
       try {
-        // Получаем всех пользователей кроме текущего
+        // Получаем всех пользователей из Firestore
         const snapshot = await db.collection('users').get();
-        console.log('Найдено документов:', snapshot.size);
+        console.log('📊 Всего документов в Firestore:', snapshot.size);
         
         allUsers = [];
         
         snapshot.forEach(doc => {
-          console.log('Документ:', doc.id, doc.data());
+          console.log('📄 Документ:', doc.id, doc.data());
+          
+          // Добавляем всех пользователей, кроме текущего
           if (doc.id !== currentUser.uid) {
             allUsers.push({
               id: doc.id,
@@ -95,7 +92,7 @@
           }
         });
         
-        console.log('Пользователей кроме текущего:', allUsers.length);
+        console.log('👥 Пользователей кроме текущего:', allUsers.length);
         
         if (allUsers.length === 0) {
           usersList.innerHTML = '<div class="no-users">Пока нет других пользователей</div>';
@@ -104,7 +101,7 @@
         }
         
       } catch (error) {
-        console.error('Ошибка загрузки пользователей:', error);
+        console.error('❌ Ошибка загрузки пользователей:', error);
         usersList.innerHTML = '<div class="error">Ошибка загрузки пользователей</div>';
       }
     }
@@ -113,10 +110,9 @@
       const usersList = document.getElementById('usersList');
       
       // Сортируем по нику
-      users.sort((a, b) => a.nickname.localeCompare(b.nickname));
+      users.sort((a, b) => (a.nickname || '').localeCompare(b.nickname || ''));
       
       usersList.innerHTML = users.map(user => {
-        // Берем первую букву ника для аватара
         const firstLetter = user.nickname ? user.nickname.charAt(0).toUpperCase() : '?';
         const tag = user.tag || '';
         const nickname = user.nickname || 'Без имени';
@@ -149,11 +145,9 @@
       displayUsers(filtered);
     }
     
-    // Выбор пользователя для чата
     function selectUser(userId, nickname, tag) {
       selectedUser = { id: userId, nickname, tag };
       
-      // Обновляем шапку чата
       document.getElementById('chatHeader').innerHTML = `
         <div class="selected-user" onclick="openUserProfile('${userId}')">
           <div class="chat-user-avatar-placeholder">${nickname.charAt(0).toUpperCase()}</div>
@@ -164,22 +158,16 @@
         </div>
       `;
       
-      // Показываем поле ввода
       document.getElementById('messageInputArea').style.display = 'flex';
-      
-      // Создаем или получаем чат
       createOrGetChat();
     }
     
-    // Создание или получение чата
     async function createOrGetChat() {
-      // Отписываемся от предыдущего чата
       if (unsubscribeMessages) {
         unsubscribeMessages();
       }
       
       try {
-        // Ищем существующий чат
         const chatsSnapshot = await db.collection('chats')
           .where('participants', 'array-contains', currentUser.uid)
           .get();
@@ -196,7 +184,6 @@
         if (chatId) {
           currentChatId = chatId;
         } else {
-          // Создаем новый чат
           const newChat = await db.collection('chats').add({
             participants: [currentUser.uid, selectedUser.id],
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -206,7 +193,6 @@
           currentChatId = newChat.id;
         }
         
-        // Загружаем сообщения
         loadMessages();
         
       } catch (error) {
@@ -214,7 +200,6 @@
       }
     }
     
-    // Загрузка сообщений
     function loadMessages() {
       const messagesContainer = document.getElementById('messagesContainer');
       
@@ -245,13 +230,9 @@
           
           messagesContainer.innerHTML = messagesHTML;
           messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }, (error) => {
-          console.error('Ошибка загрузки сообщений:', error);
-          messagesContainer.innerHTML = '<div class="error">Ошибка загрузки сообщений</div>';
         });
     }
     
-    // Отправка сообщения
     async function sendMessage() {
       const input = document.getElementById('messageInput');
       const text = input.value.trim();
@@ -268,7 +249,6 @@
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
           });
         
-        // Обновляем последнее сообщение в чате
         await db.collection('chats').doc(currentChatId).update({
           lastMessage: text,
           lastMessageTime: firebase.firestore.FieldValue.serverTimestamp()
@@ -281,12 +261,10 @@
       }
     }
     
-    // Открыть профиль пользователя
     function openUserProfile(userId) {
       window.location.href = `user.html?id=${userId}`;
     }
     
-    // Выход из аккаунта
     function logout() {
       auth.signOut()
         .then(() => {
