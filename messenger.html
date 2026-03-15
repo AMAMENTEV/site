@@ -276,5 +276,15 @@
         });
     }
   </script>
+<!-- Добавьте перед закрывающим тегом </body> -->
+<button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+<div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+<script>
+function toggleSidebar() {
+  document.querySelector('.users-sidebar').classList.toggle('active');
+  document.querySelector('.sidebar-overlay').classList.toggle('active');
+}
+</script>
 </body>
 </html>
