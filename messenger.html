@@ -10,20 +10,23 @@
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
 </head>
 <body>
-  <!-- Верхняя панель с кнопками -->
-  <div class="top-bar">
-    <div class="top-bar-left">
-      <h1>Пользователи</h1>
-    </div>
-    <div class="top-bar-right">
-      <a href="profile.html" class="top-bar-btn profile">Мой профиль</a>
-      <button onclick="logout()" class="top-bar-btn logout">Выйти</button>
-    </div>
-  </div>
-
   <div class="messenger-container">
-    <!-- Левая панель - список пользователей -->
+    <!-- Первая колонка - навигация -->
+    <div class="nav-sidebar">
+      <h2>Меню</h2>
+      <div class="nav-buttons">
+        <a href="profile.html" class="nav-button profile">Мой профиль</a>
+        <button onclick="logout()" class="nav-button logout">Выйти</button>
+      </div>
+    </div>
+    
+    <!-- Вторая колонка - список пользователей -->
     <div class="users-sidebar">
+      <div class="users-header">
+        <h2>Пользователи</h2>
+        <p>Выберите кому написать</p>
+      </div>
+      
       <div class="search-box">
         <input type="text" id="searchInput" placeholder="Поиск по нику или тегу..." onkeyup="searchUsers()">
       </div>
@@ -33,7 +36,7 @@
       </div>
     </div>
     
-    <!-- Правая панель - чат -->
+    <!-- Третья колонка - чат -->
     <div class="chat-area">
       <div class="chat-header" id="chatHeader">
         <div class="no-chat-selected">Выберите пользователя для начала чата</div>
@@ -62,7 +65,6 @@
     let currentChatId = null;
     let unsubscribeMessages = null;
     let allUsers = [];
-    let pendingMessages = new Map(); // Для временных сообщений
     
     auth.onAuthStateChanged(async (user) => {
       if (!user || !user.emailVerified) {
@@ -151,7 +153,7 @@
       selectedUser = { id: userId, nickname, tag };
       
       document.getElementById('chatHeader').innerHTML = `
-        <div class="selected-user" onclick="openUserProfile('${userId}')">
+        <div class="selected-user">
           <div class="chat-user-avatar-placeholder">${nickname.charAt(0).toUpperCase()}</div>
           <div class="chat-user-info">
             <h3>${nickname}</h3>
@@ -211,42 +213,21 @@
         .collection('messages')
         .orderBy('timestamp', 'asc')
         .onSnapshot((snapshot) => {
-          // Объединяем реальные сообщения с ожидающими
-          const realMessages = [];
-          snapshot.forEach(doc => {
-            const msg = doc.data();
-            realMessages.push({
-              id: doc.id,
-              ...msg,
-              timestamp: msg.timestamp?.toDate() || new Date()
-            });
-          });
-          
-          // Добавляем ожидающие сообщения
-          const pendingForThisChat = Array.from(pendingMessages.values())
-            .filter(msg => msg.chatId === currentChatId && msg.status === 'pending');
-          
-          const allMessages = [...realMessages, ...pendingForThisChat]
-            .sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-          
-          if (allMessages.length === 0) {
+          if (snapshot.empty) {
             messagesContainer.innerHTML = '<div class="no-messages">Нет сообщений. Напишите что-нибудь!</div>';
             return;
           }
           
           let messagesHTML = '';
-          allMessages.forEach(msg => {
+          snapshot.forEach(doc => {
+            const msg = doc.data();
             const isMyMessage = msg.senderId === currentUser.uid;
-            const time = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
-            const statusClass = msg.status === 'pending' ? 'pending' : (msg.status === 'error' ? 'error' : '');
+            const time = msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
             
             messagesHTML += `
-              <div class="message ${isMyMessage ? 'my-message' : 'other-message'} ${statusClass}">
+              <div class="message ${isMyMessage ? 'my-message' : 'other-message'}">
                 <div class="message-content">${msg.text}</div>
-                <div class="message-time">
-                  ${time}
-                  ${msg.status === 'pending' ? '<span class="loading-indicator"></span>' : ''}
-                </div>
+                <div class="message-time">${time}</div>
               </div>
             `;
           });
@@ -259,35 +240,14 @@
     async function sendMessage() {
       const input = document.getElementById('messageInput');
       const text = input.value.trim();
-      const sendButton = document.getElementById('sendButton');
       
       if (!text || !currentChatId) return;
       
       // Очищаем поле сразу
       input.value = '';
       
-      // Создаем временное сообщение
-      const tempId = 'temp_' + Date.now();
-      const tempMessage = {
-        id: tempId,
-        text: text,
-        senderId: currentUser.uid,
-        receiverId: selectedUser.id,
-        timestamp: new Date(),
-        status: 'pending',
-        chatId: currentChatId
-      };
-      
-      // Добавляем в ожидающие
-      pendingMessages.set(tempId, tempMessage);
-      
-      // Обновляем отображение
-      const messagesContainer = document.getElementById('messagesContainer');
-      // Триггерим обновление через snapshot
-      
       try {
-        // Отправляем в Firebase
-        const docRef = await db.collection('chats').doc(currentChatId)
+        await db.collection('chats').doc(currentChatId)
           .collection('messages')
           .add({
             text: text,
@@ -301,23 +261,12 @@
           lastMessageTime: firebase.firestore.FieldValue.serverTimestamp()
         });
         
-        // Удаляем из ожидающих после успешной отправки
-        pendingMessages.delete(tempId);
-        
       } catch (error) {
         console.error('Ошибка отправки:', error);
-        
-        // Помечаем сообщение как ошибочное
-        if (pendingMessages.has(tempId)) {
-          pendingMessages.get(tempId).status = 'error';
-        }
-        
         alert('Ошибка при отправке сообщения');
+        // Возвращаем текст обратно если ошибка
+        input.value = text;
       }
-    }
-    
-    function openUserProfile(userId) {
-      window.location.href = `user.html?id=${userId}`;
     }
     
     function logout() {
