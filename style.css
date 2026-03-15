@@ -671,3 +671,24 @@ body {
 .mobile-menu-btn {
   display: none;
 }
+
+// Добавьте после получения currentUser
+async function displayCurrentUser() {
+  const userDoc = await db.collection('users').doc(currentUser.uid).get();
+  if (userDoc.exists) {
+    const userData = userDoc.data();
+    const profileDiv = document.getElementById('currentUserProfile');
+    const firstLetter = userData.nickname ? userData.nickname.charAt(0).toUpperCase() : '?';
+    
+    profileDiv.innerHTML = `
+      <div class="current-user-avatar">${firstLetter}</div>
+      <div class="current-user-info">
+        <h3>${userData.nickname || 'Пользователь'}</h3>
+        <p>${userData.tag || ''}</p>
+      </div>
+    `;
+  }
+}
+
+// Вызовите ее в auth.onAuthStateChanged после currentUser = user;
+displayCurrentUser();
