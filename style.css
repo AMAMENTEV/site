@@ -854,18 +854,22 @@ body {
 
 /* ========== СТИЛИ ДЛЯ НЕПРОЧИТАННЫХ СООБЩЕНИЙ ========== */
 .unread-badge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background-color: #3b82f6;
   color: white;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 600;
   min-width: 20px;
   height: 20px;
   border-radius: 10px;
-  padding: 0 6px;
+  padding: 0 5px;
   margin-left: 8px;
   text-align: center;
-  line-height: 20px;
+  line-height: 1;
+  vertical-align: middle;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
   animation: pulse 2s infinite;
 }
 
@@ -894,3 +898,11 @@ body {
   color: #0f172a;
 }
 
+.user-name {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  font-weight: 600;
+  color: #0f172a;
+  margin-bottom: 4px;
+}

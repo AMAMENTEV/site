@@ -387,15 +387,15 @@
             const time = msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
             
             // Если сообщение не от меня и не прочитано, помечаем как прочитанное
-            if (!isMyMessage && !msg.read) {
-              doc.ref.update({ read: true });
-              
-              // Обновляем счетчик непрочитанных для этого пользователя
-              if (unreadCounts[selectedUser.id] > 0) {
-                unreadCounts[selectedUser.id]--;
-                loadUsers(); // Обновляем список пользователей
-              }
-            }
+if (!isMyMessage && !msg.read) {
+  doc.ref.update({ read: true });
+  
+  // Обновляем счетчик непрочитанных для этого пользователя
+  if (unreadCounts[selectedUser.id] > 0) {
+    unreadCounts[selectedUser.id]--;
+    loadUsers(); // Обновляем список пользователей
+  }
+}
             
             html += `
               <div class="message ${isMyMessage ? 'my-message' : 'other-message'}">
@@ -411,33 +411,40 @@
     }
 
     // ---------- Отправка сообщения ----------
-    async function sendMessage() {
-      const input = document.getElementById('messageInput');
-      const text = input.value.trim();
-      if (!text || !currentChatId || !selectedUser) return;
+async function sendMessage() {
+  const input = document.getElementById('messageInput');
+  const text = input.value.trim();
+  if (!text || !currentChatId || !selectedUser) return;
 
-      input.value = '';
+  input.value = '';
 
-      try {
-        await db.collection('chats').doc(currentChatId)
-          .collection('messages')
-          .add({
-            text: text,
-            senderId: currentUser.uid,
-            receiverId: selectedUser.id,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            read: false // Добавляем поле read
-          });
-        await db.collection('chats').doc(currentChatId).update({
-          lastMessage: text,
-          lastMessageTime: firebase.firestore.FieldValue.serverTimestamp()
-        });
-      } catch (error) {
-        console.error('Ошибка отправки:', error);
-        alert('Ошибка при отправке сообщения');
-        input.value = text;
-      }
-    }
+  try {
+    await db.collection('chats').doc(currentChatId)
+      .collection('messages')
+      .add({
+        text: text,
+        senderId: currentUser.uid,
+        receiverId: selectedUser.id,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+        read: false
+      });
+    await db.collection('chats').doc(currentChatId).update({
+      lastMessage: text,
+      lastMessageTime: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    
+    // После отправки сообщения обновляем список пользователей,
+    // чтобы этот чат поднялся наверх
+    setTimeout(() => {
+      loadUsers();
+    }, 300);
+    
+  } catch (error) {
+    console.error('Ошибка отправки:', error);
+    alert('Ошибка при отправке сообщения');
+    input.value = text;
+  }
+}
 
     // ---------- Мобильное меню (бургер) ----------
     function toggleMobileMenu() {
