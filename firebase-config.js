@@ -28,15 +28,12 @@ auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
 auth.onAuthStateChanged((user) => {
   const currentPage = window.location.pathname.split('/').pop() || 'index.html';
   
-  // Если мы на странице регистрации - НИЧЕГО НЕ ДЕЛАЕМ, даем пользователю зарегистрироваться
-  if (currentPage === 'register.html') {
-    console.log('📝 Страница регистрации - не перенаправляем');
-    return;
-  }
+  // Список страниц, на которых НЕ нужно перенаправлять
+  const allowedPages = ['index.html', 'register.html', 'user.html'];
   
-  // Если мы на странице входа - тоже ничего не делаем принудительно
-  if (currentPage === 'index.html') {
-    console.log('🔑 Страница входа - не перенаправляем автоматически');
+  // Если мы на разрешенной странице - ничего не делаем
+  if (allowedPages.includes(currentPage)) {
+    console.log(`📄 Страница ${currentPage} - не перенаправляем`);
     return;
   }
   
