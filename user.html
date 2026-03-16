@@ -79,8 +79,6 @@
                   <span>${userData.tag}</span>
                 </div>
               </div>
-              
-              <button onclick="startChat()" class="chat-btn">Написать сообщение</button>
             </div>
           </div>
           
@@ -114,11 +112,16 @@
       }
       
       try {
+        // Проверяем существование коллекции posts
+        const postsRef = db.collection('posts');
+        
         // Слушаем изменения в постах в реальном времени
-        unsubscribePosts = db.collection('posts')
+        unsubscribePosts = postsRef
           .where('userId', '==', targetUserId)
           .orderBy('createdAt', 'desc')
           .onSnapshot(snapshot => {
+            console.log('Posts snapshot received:', snapshot.size);
+            
             if (snapshot.empty) {
               postsContainer.innerHTML = '<div class="no-posts">У пользователя пока нет постов</div>';
               return;
@@ -127,14 +130,23 @@
             let postsHTML = '';
             snapshot.forEach(doc => {
               const post = doc.data();
-              const date = post.createdAt ? new Date(post.createdAt.toDate()).toLocaleString() : '';
+              console.log('Post data:', post);
+              
+              let date = 'Дата неизвестна';
+              if (post.createdAt) {
+                try {
+                  date = new Date(post.createdAt.toDate()).toLocaleString();
+                } catch (e) {
+                  date = 'Только что';
+                }
+              }
               
               postsHTML += `
                 <div class="post-card">
                   <div class="post-header">
                     <span class="post-date">${date}</span>
                   </div>
-                  <div class="post-content">${post.content.replace(/\n/g, '<br>')}</div>
+                  <div class="post-content">${post.content ? post.content.replace(/\n/g, '<br>') : ''}</div>
                 </div>
               `;
             });
@@ -142,17 +154,17 @@
             postsContainer.innerHTML = postsHTML;
           }, error => {
             console.error('Ошибка загрузки постов:', error);
-            postsContainer.innerHTML = '<div class="error">Ошибка загрузки постов</div>';
+            if (error.code === 'failed-precondition') {
+              postsContainer.innerHTML = '<div class="error">Требуется создать индекс. Подождите минуту и обновите страницу.</div>';
+            } else {
+              postsContainer.innerHTML = '<div class="error">Ошибка загрузки постов</div>';
+            }
           });
           
       } catch (error) {
         console.error('Ошибка:', error);
         postsContainer.innerHTML = '<div class="error">Ошибка загрузки постов</div>';
       }
-    }
-
-    function startChat() {
-      window.location.href = `messenger.html?userId=${userId}`;
     }
   </script>
 </body>
