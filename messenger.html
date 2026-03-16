@@ -207,201 +207,163 @@
     }
 
     // ---------- Загрузка списка чатов ----------
-    async function loadChats() {
-      const chatsList = document.getElementById('chatsList');
-      if (!chatsList) return;
+async function loadChats() {
+  const chatsList = document.getElementById('chatsList');
+  if (!chatsList) return;
       
-      chatsList.innerHTML = '<div class="loading">Загрузка чатов...</div>';
+  chatsList.innerHTML = '<div class="loading">Загрузка чатов...</div>';
       
-      try {
-        // Получаем все чаты текущего пользователя
-        const chatsSnapshot = await db.collection('chats')
-          .where('participants', 'array-contains', currentUser.uid)
-          .get();
+  try {
+    // Получаем все чаты текущего пользователя
+    const chatsSnapshot = await db.collection('chats')
+      .where('participants', 'array-contains', currentUser.uid)
+      .get();
 
-        // Используем Map для уникальности чатов
-        const chatsMap = new Map();
-        const newUnreadCounts = {};
+    // Используем Map для уникальности чатов
+    const chatsMap = new Map();
+    const newUnreadCounts = {};
         
-        for (const doc of chatsSnapshot.docs) {
-          // Если чат уже есть в Map, пропускаем
-          if (chatsMap.has(doc.id)) continue;
+    for (const doc of chatsSnapshot.docs) {
+      // Если чат уже есть в Map, пропускаем
+      if (chatsMap.has(doc.id)) continue;
           
-          const chat = doc.data();
+      const chat = doc.data();
           
-          // Определяем название и аватар чата
-          let chatName = '';
-          let chatAvatar = '';
+      // Определяем название и аватар чата
+      let chatName = '';
+      let chatAvatar = '';
           
-          if (chat.isGroup) {
-            // Групповой чат
-            chatName = chat.name || 'Беседа';
-            chatAvatar = '👥';
-          } else {
-            // Личный чат - находим имя собеседника
-            const otherUserId = chat.participants.find(id => id !== currentUser.uid);
-            const otherUser = await getUserById(otherUserId);
-            chatName = otherUser ? otherUser.nickname : 'Пользователь';
-            chatAvatar = otherUser ? otherUser.tag : '';
-          }
+      if (chat.isGroup) {
+        // Групповой чат
+        chatName = chat.name || 'Беседа';
+        chatAvatar = '👥';
+      } else {
+        // Личный чат - находим имя собеседника
+        const otherUserId = chat.participants.find(id => id !== currentUser.uid);
+        const otherUser = await getUserById(otherUserId);
+        chatName = otherUser ? otherUser.nickname : 'Пользователь';
+        chatAvatar = otherUser ? otherUser.tag : '';
+      }
           
-          // Получаем последнее не удаленное сообщение
-let lastMessage = null;
-let lastMessageTime = chat.lastMessageTime ? chat.lastMessageTime.toDate?.() || new Date(chat.lastMessageTime) : new Date(0);
+      // Получаем последнее не удаленное сообщение
+      let lastMessage = null;
+      let lastMessageTime = chat.lastMessageTime ? chat.lastMessageTime.toDate?.() || new Date(chat.lastMessageTime) : new Date(0);
 
-// Ищем последнее не удаленное сообщение
-const messagesQuery = await db.collection('chats').doc(doc.id)
-  .collection('messages')
-  .orderBy('timestamp', 'desc')
-  .limit(20)
-  .get();
+      // Ищем последнее не удаленное сообщение
+      const messagesQuery = await db.collection('chats').doc(doc.id)
+        .collection('messages')
+        .orderBy('timestamp', 'desc')
+        .limit(20)
+        .get();
 
-for (const msgDoc of messagesQuery.docs) {
-  const msg = msgDoc.data();
+      for (const msgDoc of messagesQuery.docs) {
+        const msg = msgDoc.data();
   
-  // Проверяем, не удалено ли сообщение для всех
-  if (msg.deletedFor && msg.deletedFor.includes('everyone')) {
-    continue; // Пропускаем удаленные для всех
-  }
-  
-  // Проверяем, не удалено ли сообщение для текущего пользователя
-  if (msg.deletedFor && msg.deletedFor.includes(currentUser.uid)) {
-    continue; // Пропускаем удаленные для текущего
-  }
-  
-  // Нашли последнее не удаленное сообщение
-  lastMessage = msg.text;
-  lastMessageTime = msg.timestamp ? msg.timestamp.toDate?.() || new Date(msg.timestamp) : lastMessageTime;
-  break;
-}
-          
-          if (chat.lastMessage) {
-            // Проверяем, не удалено ли последнее сообщение
-            const lastMessageDoc = await db.collection('chats').doc(doc.id)
-              .collection('messages')
-              .orderBy('timestamp', 'desc')
-              .limit(1)
-              .get();
-              
-            if (!lastMessageDoc.empty) {
-              const msg = lastMessageDoc.docs[0].data();
-              // Проверяем, не удалено ли сообщение
-              if (!msg.deletedFor || 
-                  (!msg.deletedFor.includes('everyone') && !msg.deletedFor.includes(currentUser.uid))) {
-                lastMessage = msg.text;
-                lastMessageTime = msg.timestamp ? msg.timestamp.toDate?.() || new Date(msg.timestamp) : lastMessageTime;
-              } else {
-                // Если последнее сообщение удалено, ищем предыдущее
-                const messagesSnapshot = await db.collection('chats').doc(doc.id)
-                  .collection('messages')
-                  .orderBy('timestamp', 'desc')
-                  .limit(10)
-                  .get();
-                  
-                for (const msgDoc of messagesSnapshot.docs) {
-                  const msg = msgDoc.data();
-                  if (!msg.deletedFor || 
-                      (!msg.deletedFor.includes('everyone') && !msg.deletedFor.includes(currentUser.uid))) {
-                    lastMessage = msg.text;
-                    lastMessageTime = msg.timestamp ? msg.timestamp.toDate?.() || new Date(msg.timestamp) : lastMessageTime;
-                    break;
-                  }
-                }
-              }
-            }
-          }
-          
-          // В функции loadChats(), в месте где считаются непрочитанные сообщения:
-
-// Получаем количество непрочитанных сообщений
-const messagesSnapshot = await db.collection('chats').doc(doc.id)
-  .collection('messages')
-  .where('read', '==', false)
-  .get();
-
-// Для группового чата считаем непрочитанные, только если сообщение не от текущего пользователя
-let unreadCount = 0;
-messagesSnapshot.forEach(msgDoc => {
-  const msg = msgDoc.data();
-  
-  // Проверяем, не удалено ли сообщение для всех
-  if (msg.deletedFor && msg.deletedFor.includes('everyone')) {
-    return; // Пропускаем удаленные для всех
-  }
-  
-  // Проверяем, не удалено ли сообщение для текущего пользователя
-  if (msg.deletedFor && msg.deletedFor.includes(currentUser.uid)) {
-    return; // Пропускаем удаленные для текущего
-  }
-  
-  if (chat.isGroup) {
-    // В групповом чате сообщение непрочитано, если оно не от текущего пользователя
-    if (msg.senderId !== currentUser.uid) {
-      unreadCount++;
-    }
-  } else {
-    // В личном чате - только те, которые адресованы текущему
-    if (msg.receiverId === currentUser.uid) {
-      unreadCount++;
-    }
-  }
-});
-          
-          newUnreadCounts[doc.id] = unreadCount;
-          
-          chatsMap.set(doc.id, {
-            id: doc.id,
-            ...chat,
-            displayName: chatName,
-            displayAvatar: chatAvatar,
-            lastMessage: lastMessage,
-            lastMessageTime: lastMessageTime
-          });
+        // Проверяем, не удалено ли сообщение для всех
+        if (msg.deletedFor && msg.deletedFor.includes('everyone')) {
+          continue; // Пропускаем удаленные для всех
         }
-        
-        unreadCounts = newUnreadCounts;
-        
-        // Преобразуем Map в массив
-        allChats = Array.from(chatsMap.values());
-
-        // Сортируем чаты: сначала с непрочитанными, потом по времени последнего сообщения
-        allChats.sort((a, b) => {
-          const unreadA = unreadCounts[a.id] || 0;
-          const unreadB = unreadCounts[b.id] || 0;
+  
+        // Проверяем, не удалено ли сообщение для текущего пользователя
+        if (msg.deletedFor && msg.deletedFor.includes(currentUser.uid)) {
+          continue; // Пропускаем удаленные для текущего
+        }
+  
+        // Нашли последнее не удаленное сообщение
+        lastMessage = msg.text;
+        lastMessageTime = msg.timestamp ? msg.timestamp.toDate?.() || new Date(msg.timestamp) : lastMessageTime;
+        break;
+      }
           
-          if (unreadB !== unreadA) {
-            return unreadB - unreadA;
+      // Получаем количество непрочитанных сообщений
+      const messagesSnapshot = await db.collection('chats').doc(doc.id)
+        .collection('messages')
+        .where('read', '==', false)
+        .get();
+
+      // Для группового чата считаем непрочитанные, только если сообщение не от текущего пользователя
+      let unreadCount = 0;
+      messagesSnapshot.forEach(msgDoc => {
+        const msg = msgDoc.data();
+  
+        // Проверяем, не удалено ли сообщение для всех
+        if (msg.deletedFor && msg.deletedFor.includes('everyone')) {
+          return; // Пропускаем удаленные для всех
+        }
+  
+        // Проверяем, не удалено ли сообщение для текущего пользователя
+        if (msg.deletedFor && msg.deletedFor.includes(currentUser.uid)) {
+          return; // Пропускаем удаленные для текущего
+        }
+  
+        if (chat.isGroup) {
+          // В групповом чате сообщение непрочитано, если оно не от текущего пользователя
+          if (msg.senderId !== currentUser.uid) {
+            unreadCount++;
           }
-          
-          return b.lastMessageTime - a.lastMessageTime;
-        });
-
-        if (allChats.length === 0) {
-          chatsList.innerHTML = '<div class="no-chats">У вас пока нет чатов. Найдите пользователя через поиск.</div>';
         } else {
-          displayChats(allChats);
-        }
-
-        // Проверяем, есть ли параметр chatId в URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const targetChatId = urlParams.get('chatId');
-
-        if (targetChatId) {
-          const targetChat = allChats.find(c => c.id === targetChatId);
-          if (targetChat) {
-            setTimeout(() => {
-              selectChat(targetChat);
-              const newUrl = window.location.pathname;
-              window.history.replaceState({}, document.title, newUrl);
-            }, 500);
+          // В личном чате - только те, которые адресованы текущему
+          if (msg.receiverId === currentUser.uid) {
+            unreadCount++;
           }
         }
+      });
+          
+      newUnreadCounts[doc.id] = unreadCount;
+          
+      chatsMap.set(doc.id, {
+        id: doc.id,
+        ...chat,
+        displayName: chatName,
+        displayAvatar: chatAvatar,
+        lastMessage: lastMessage,
+        lastMessageTime: lastMessageTime
+      });
+    }
         
-      } catch (error) {
-        console.error('Ошибка загрузки чатов:', error);
-        chatsList.innerHTML = '<div class="error">Ошибка загрузки чатов</div>';
+    unreadCounts = newUnreadCounts;
+        
+    // Преобразуем Map в массив
+    allChats = Array.from(chatsMap.values());
+
+    // Сортируем чаты: сначала с непрочитанными, потом по времени последнего сообщения
+    allChats.sort((a, b) => {
+      const unreadA = unreadCounts[a.id] || 0;
+      const unreadB = unreadCounts[b.id] || 0;
+          
+      if (unreadB !== unreadA) {
+        return unreadB - unreadA;
+      }
+          
+      return b.lastMessageTime - a.lastMessageTime;
+    });
+
+    if (allChats.length === 0) {
+      chatsList.innerHTML = '<div class="no-chats">У вас пока нет чатов. Найдите пользователя через поиск.</div>';
+    } else {
+      displayChats(allChats);
+    }
+
+    // Проверяем, есть ли параметр chatId в URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const targetChatId = urlParams.get('chatId');
+
+    if (targetChatId) {
+      const targetChat = allChats.find(c => c.id === targetChatId);
+      if (targetChat) {
+        setTimeout(() => {
+          selectChat(targetChat);
+          const newUrl = window.location.pathname;
+          window.history.replaceState({}, document.title, newUrl);
+        }, 500);
       }
     }
+        
+  } catch (error) {
+    console.error('Ошибка загрузки чатов:', error);
+    chatsList.innerHTML = '<div class="error">Ошибка загрузки чатов</div>';
+  }
+}
 
     async function getUserById(userId) {
       try {
