@@ -854,32 +854,33 @@ async function loadChats() {
     }
 
     // ---------- Глобальное прослушивание новых сообщений ----------
-    function listenForNewMessages() {
-      if (!currentUser) return;
-      
-      db.collection('chats')
-        .where('participants', 'array-contains', currentUser.uid)
-        .onSnapshot(snapshot => {
-          snapshot.docChanges().forEach(change => {
-            if (change.type === 'modified' || change.type === 'added') {
-              console.log('Chat updated, refreshing chats list');
-              loadChats();
-            }
-          });
-        }, error => console.error('Ошибка прослушивания чатов:', error));
-      
-      db.collectionGroup('messages')
-        .where('receiverId', '==', currentUser.uid)
-        .where('read', '==', false)
-        .onSnapshot(snapshot => {
-          snapshot.docChanges().forEach(change => {
-            if (change.type === 'added') {
-              console.log('New unread message received');
-              loadChats();
-            }
-          });
-        }, error => console.error('Ошибка прослушивания сообщений:', error));
-    }
+    // ---------- Глобальное прослушивание новых сообщений ----------
+function listenForNewMessages() {
+  if (!currentUser) return;
+  
+  db.collection('chats')
+    .where('participants', 'array-contains', currentUser.uid)
+    .onSnapshot(snapshot => {
+      snapshot.docChanges().forEach(change => {
+        if (change.type === 'modified' || change.type === 'added') {
+          console.log('Chat updated, refreshing chats list');
+          loadChats();
+        }
+      });
+    }, error => console.error('Ошибка прослушивания чатов:', error));
+  
+  db.collectionGroup('messages')
+    .where('receiverId', '==', currentUser.uid)
+    .where('read', '==', false)
+    .onSnapshot(snapshot => {
+      snapshot.docChanges().forEach(change => {
+        if (change.type === 'added') {
+          console.log('New unread message received');
+          loadChats();
+        }
+      });
+    }, error => console.error('Ошибка прослушивания сообщений:', error));
+}
 
     // ---------- Создание группового чата ----------
     function showCreateGroupModal() {
@@ -1188,10 +1189,8 @@ async function deleteMessageForMe() {
     
     hideMessageOptions();
     
-    // Ждем немного и обновляем список чатов
-    setTimeout(async () => {
-      await loadChats();
-    }, 500);
+    // НЕ вызываем loadChats() - слушатель сам обновит
+    // Слушатель в listenForNewMessages() сработает у всех
     
   } catch (error) {
     console.error('Ошибка удаления сообщения:', error);
@@ -1215,17 +1214,13 @@ async function deleteMessageForEveryone() {
     
     hideMessageOptions();
     
-    // Ждем немного и обновляем список чатов
-    setTimeout(async () => {
-      await loadChats();
-    }, 500);
+    // НЕ вызываем loadChats() - слушатель сам обновит
     
   } catch (error) {
     console.error('Ошибка удаления сообщения:', error);
     alert('Ошибка при удалении сообщения');
   }
 }
-
     // ---------- Переключение режимов на мобилках ----------
     function enterChatMode() {
       isChatMode = true;
