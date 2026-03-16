@@ -1230,7 +1230,6 @@ async function deleteMessageForEveryone() {
   if (!confirm('Удалить это сообщение у всех участников?')) return;
   
   try {
-    // Помечаем сообщение как удаленное для всех
     await db.collection('chats').doc(currentChatId)
       .collection('messages')
       .doc(selectedMessageId)
@@ -1239,8 +1238,7 @@ async function deleteMessageForEveryone() {
       });
     
     hideMessageOptions();
-    
-    // НЕ вызываем loadChats() - слушатель сам обновит
+    // НЕ вызываем loadChats() - слушатель сам обновит у всех
     
   } catch (error) {
     console.error('Ошибка удаления сообщения:', error);
