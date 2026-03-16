@@ -11,7 +11,7 @@ html, body {
   height: 100%;
   margin: 0;
   padding: 0;
-  overflow: hidden;
+  overflow: hidden; /* По умолчанию скрываем прокрутку */
 }
 
 body {
@@ -675,14 +675,12 @@ body {
 
 /* ========== МОБИЛЬНАЯ ВЕРСИЯ (ОБЩАЯ) ========== */
 @media (max-width: 768px) {
-  /* Отключаем глобальный overflow hidden для мобильных */
-  html, body {
-    overflow-y: auto;
-    height: auto;
-    min-height: 100vh;
+  /* Мессенджер - сохраняем фиксированную высоту */
+  .messenger-container {
+    height: 100vh;
+    overflow: hidden;
   }
   
-  /* Мессенджер */
   .nav-sidebar {
     display: none;
   }
@@ -825,8 +823,8 @@ body {
 
 /* ========== МОБИЛЬНАЯ ВЕРСИЯ ДЛЯ ПРОФИЛЯ ========== */
 @media (max-width: 768px) {
-  /* Отключаем глобальный overflow hidden для мобильных */
-  html, body {
+  /* Для страниц профиля разрешаем прокрутку */
+  body:has(.profile-container) {
     overflow-y: auto;
     height: auto;
     min-height: 100vh;
@@ -863,7 +861,7 @@ body {
     width: 100%;
     padding-right: 0;
     overflow: visible;
-    margin-bottom: 24px;
+    margin-bottom: 20px;
   }
   
   .profile-card {
@@ -889,11 +887,11 @@ body {
   }
   
   .info-row {
-    padding: 12px 0;
+    padding: 10px 0;
   }
   
   .info-row label {
-    width: 80px;
+    width: 75px;
     font-size: 0.8rem;
   }
   
@@ -912,17 +910,15 @@ body {
     overflow: visible;
     height: auto;
     display: block;
+    margin-top: 0;
   }
   
   .posts-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
-    position: static;
-    background: transparent;
+    margin-bottom: 16px;
     padding: 0;
-    z-index: auto;
   }
   
   .posts-header h2 {
@@ -934,7 +930,6 @@ body {
     padding: 8px 14px;
     font-size: 0.85rem;
     min-height: 40px;
-    min-width: auto;
     border-radius: 20px;
     white-space: nowrap;
   }
@@ -956,7 +951,7 @@ body {
   }
   
   .post-header {
-    margin-bottom: 10px;
+    margin-bottom: 8px;
     padding-bottom: 6px;
   }
   
@@ -973,18 +968,6 @@ body {
     width: 36px;
     height: 36px;
     font-size: 1.1rem;
-  }
-  
-  /* Увеличение touch-областей */
-  .edit-btn,
-  .delete-post-btn,
-  .back-btn,
-  .logout-small-header {
-    min-height: 44px;
-    min-width: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
   }
   
   /* Убираем фиксированные высоты */
@@ -1070,6 +1053,7 @@ body {
     border-radius: 10px;
   }
 }
+
 /* ========== ДЕСКТОПНАЯ ВЕРСИЯ ========== */
 @media (min-width: 769px) {
   .mobile-menu-btn,
@@ -1340,21 +1324,6 @@ body {
 
 .chat-btn:hover {
   background: #2563eb;
-}
-
-.logout-btn {
-  padding: 14px;
-  background: #fee2e2;
-  color: #dc2626;
-  border: none;
-  border-radius: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  width: 100%;
-}
-
-.logout-btn:hover {
-  background: #fecaca;
 }
 
 /* Правая колонка - посты */
