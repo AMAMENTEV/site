@@ -825,56 +825,71 @@ body {
 
 /* ========== МОБИЛЬНАЯ ВЕРСИЯ ДЛЯ ПРОФИЛЯ ========== */
 @media (max-width: 768px) {
+  /* Отключаем глобальный overflow hidden для мобильных */
+  html, body {
+    overflow-y: auto;
+    height: auto;
+    min-height: 100vh;
+  }
+  
   .profile-container {
     height: auto;
     min-height: 100vh;
     margin: 0;
     padding: 0;
     overflow-y: visible;
+    display: block;
   }
   
   .profile-header {
-    padding: 16px 20px;
+    padding: 12px 16px;
     margin-bottom: 0;
     position: sticky;
     top: 0;
     background: white;
     z-index: 10;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
   }
   
   .profile-two-columns {
-    flex-direction: column;
+    display: block;
     gap: 0;
     overflow: visible;
     height: auto;
-    padding: 0 20px 20px 20px;
+    padding: 0 16px 30px 16px;
   }
   
   .profile-left {
     width: 100%;
     padding-right: 0;
     overflow: visible;
-    margin-bottom: 20px;
+    margin-bottom: 24px;
   }
   
   .profile-card {
-    padding: 20px;
+    padding: 20px 16px;
+    border-radius: 20px;
+  }
+  
+  .profile-avatar-placeholder {
+    margin-bottom: 16px;
   }
   
   .avatar-large {
     width: 100px;
     height: 100px;
     font-size: 2.5rem;
+    border-radius: 25px;
   }
   
   .profile-info {
-    padding: 16px;
-    margin: 16px 0;
+    padding: 16px 12px;
+    margin: 16px 0 0 0;
+    border-radius: 16px;
   }
   
   .info-row {
-    padding: 10px 0;
+    padding: 12px 0;
   }
   
   .info-row label {
@@ -882,52 +897,82 @@ body {
     font-size: 0.8rem;
   }
   
+  .info-row span {
+    font-size: 0.95rem;
+  }
+  
+  .edit-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+  }
+  
   .profile-right {
     width: 100%;
     overflow: visible;
     height: auto;
+    display: block;
   }
   
   .posts-header {
-    margin-bottom: 16px;
-    position: sticky;
-    top: 70px;
-    background: white;
-    padding: 10px 0;
-    z-index: 5;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    position: static;
+    background: transparent;
+    padding: 0;
+    z-index: auto;
   }
   
   .posts-header h2 {
-    font-size: 1.3rem;
+    font-size: 1.2rem;
+    margin: 0;
   }
   
   .create-post-btn {
-    padding: 8px 16px;
-    font-size: 0.9rem;
-    min-height: 44px;
-    min-width: 44px;
+    padding: 8px 14px;
+    font-size: 0.85rem;
+    min-height: 40px;
+    min-width: auto;
+    border-radius: 20px;
+    white-space: nowrap;
   }
   
   .posts-container {
     overflow: visible;
     padding-right: 0;
     gap: 12px;
-    padding-bottom: 30px;
+    padding-bottom: 20px;
     max-height: none;
+    display: flex;
+    flex-direction: column;
   }
   
   .post-card {
     padding: 14px;
-    margin-bottom: 8px;
+    margin-bottom: 0;
+    border-radius: 14px;
+  }
+  
+  .post-header {
+    margin-bottom: 10px;
+    padding-bottom: 6px;
   }
   
   .post-date {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
   }
   
   .post-content {
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     line-height: 1.5;
+  }
+  
+  .delete-post-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 1.1rem;
   }
   
   /* Увеличение touch-областей */
@@ -942,36 +987,89 @@ body {
     justify-content: center;
   }
   
+  /* Убираем фиксированные высоты */
+  .profile-left,
+  .profile-right,
+  .posts-container {
+    max-height: none;
+    height: auto;
+  }
+  
+  /* Исправляем отступы в шапке */
+  .header .back-btn {
+    width: 44px;
+    height: 44px;
+    font-size: 1.5rem;
+  }
+  
+  .logout-small-header {
+    padding: 6px 14px;
+    font-size: 0.85rem;
+    min-height: 40px;
+  }
+  
   /* Модальное окно */
   .modal-content {
-    width: 95%;
+    width: 90%;
     margin: 20px auto;
+    border-radius: 20px;
   }
   
   .modal-header {
-    padding: 16px 20px;
+    padding: 14px 18px;
   }
   
   .modal-header h3 {
-    font-size: 1.2rem;
+    font-size: 1.1rem;
+  }
+  
+  .modal-close {
+    width: 44px;
+    height: 44px;
+    font-size: 1.5rem;
   }
   
   .modal-body {
-    padding: 20px;
+    padding: 16px;
+  }
+  
+  .modal-body textarea {
+    padding: 12px;
+    font-size: 0.95rem;
+    border-radius: 10px;
   }
   
   .modal-footer {
-    padding: 16px 20px;
+    padding: 14px 18px;
+    gap: 8px;
   }
   
   .modal-cancel-btn,
   .modal-save-btn {
-    padding: 8px 16px;
+    padding: 8px 14px;
+    font-size: 0.85rem;
+    min-height: 40px;
+    border-radius: 20px;
+  }
+  
+  /* Убираем лишние отступы */
+  .profile-info .save-btn {
+    margin-top: 12px;
+    padding: 10px;
     font-size: 0.9rem;
-    min-height: 44px;
+  }
+  
+  /* Сообщения об ошибках/успехе */
+  .message {
+    margin-top: 12px;
+  }
+  
+  .error, .success, .warning, .info {
+    padding: 12px 16px;
+    font-size: 0.9rem;
+    border-radius: 10px;
   }
 }
-
 /* ========== ДЕСКТОПНАЯ ВЕРСИЯ ========== */
 @media (min-width: 769px) {
   .mobile-menu-btn,
