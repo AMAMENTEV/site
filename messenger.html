@@ -92,99 +92,122 @@
     });
 
     // ---------- Загрузка списка пользователей ----------
-    async function loadUsers() {
-      const usersList = document.getElementById('usersList');
-      usersList.innerHTML = '<div class="loading">Загрузка пользователей...</div>';
-      
-      try {
-        // 1. Получаем всех пользователей из Firestore
-        const usersSnapshot = await db.collection('users').get();
-        const allUsersMap = new Map();
-        usersSnapshot.forEach(doc => {
-          if (doc.id !== currentUser.uid) {
-            allUsersMap.set(doc.id, { id: doc.id, ...doc.data() });
-          }
-        });
+    // ---------- Загрузка списка пользователей ----------
+async function loadUsers() {
+  const usersList = document.getElementById('usersList');
+  usersList.innerHTML = '<div class="loading">Загрузка пользователей...</div>';
+  
+  try {
+    // 1. Получаем всех пользователей из Firestore
+    const usersSnapshot = await db.collection('users').get();
+    const allUsersMap = new Map();
+    usersSnapshot.forEach(doc => {
+      if (doc.id !== currentUser.uid) {
+        allUsersMap.set(doc.id, { id: doc.id, ...doc.data() });
+      }
+    });
 
-        // 2. Получаем все чаты текущего пользователя
-        const chatsSnapshot = await db.collection('chats')
-          .where('participants', 'array-contains', currentUser.uid)
+    // 2. Получаем все чаты текущего пользователя
+    const chatsSnapshot = await db.collection('chats')
+      .where('participants', 'array-contains', currentUser.uid)
+      .get();
+
+    // 3. Собираем ID пользователей и получаем непрочитанные сообщения
+    const chatUserIds = new Set();
+    const newUnreadCounts = {};
+    
+    // Сначала получаем время последнего сообщения для каждого чата
+    const lastMessageTimes = {};
+    
+    for (const doc of chatsSnapshot.docs) {
+      const chat = doc.data();
+      const otherUserId = chat.participants.find(id => id !== currentUser.uid);
+      if (otherUserId) {
+        chatUserIds.add(otherUserId);
+        
+        // Сохраняем время последнего сообщения
+        if (chat.lastMessageTime) {
+          lastMessageTimes[otherUserId] = chat.lastMessageTime;
+        }
+        
+        // Получаем количество непрочитанных сообщений в этом чате
+        const messagesSnapshot = await db.collection('chats').doc(doc.id)
+          .collection('messages')
+          .where('read', '==', false)
+          .where('receiverId', '==', currentUser.uid)
           .get();
-
-        // 3. Собираем ID пользователей и получаем непрочитанные сообщения
-        const chatUserIds = new Set();
-        unreadCounts = {};
         
-        for (const doc of chatsSnapshot.docs) {
-          const chat = doc.data();
-          const otherUserId = chat.participants.find(id => id !== currentUser.uid);
-          if (otherUserId) {
-            chatUserIds.add(otherUserId);
-            
-            // Получаем количество непрочитанных сообщений в этом чате
-            const messagesSnapshot = await db.collection('chats').doc(doc.id)
-              .collection('messages')
-              .where('read', '==', false)
-              .where('receiverId', '==', currentUser.uid)
-              .get();
-            
-            unreadCounts[otherUserId] = messagesSnapshot.size;
-          }
-        }
-
-        // 4. Формируем список пользователей для отображения
-        allUsers = []; // полный список для поиска
-        const chatUsers = []; // только с чатами
-
-        allUsersMap.forEach((user, id) => {
-          allUsers.push(user);
-          if (chatUserIds.has(id)) {
-            chatUsers.push(user);
-          }
-        });
-
-        // 5. Сортируем пользователей: сначала с непрочитанными, потом по алфавиту
-        chatUsers.sort((a, b) => {
-          const unreadA = unreadCounts[a.id] || 0;
-          const unreadB = unreadCounts[b.id] || 0;
-          
-          // Сначала по количеству непрочитанных (от большего к меньшему)
-          if (unreadB !== unreadA) {
-            return unreadB - unreadA;
-          }
-          // Потом по алфавиту
-          return (a.nickname || '').localeCompare(b.nickname || '');
-        });
-
-        // 6. Отображаем пользователей с чатами
-        if (chatUsers.length === 0) {
-          usersList.innerHTML = '<div class="no-users">Нет активных чатов. Найдите пользователя через поиск.</div>';
-        } else {
-          displayUsers(chatUsers);
-        }
-
-        // Сохраняем полный список для поиска
-        window.allUsers = allUsers;
-
-        // Проверяем, есть ли параметр userId в URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const targetUserId = urlParams.get('userId');
-
-        if (targetUserId) {
-          // Ищем пользователя в allUsers
-          const targetUser = allUsers.find(u => u.id === targetUserId);
-          if (targetUser) {
-            setTimeout(() => {
-              selectUser(targetUser.id, targetUser.nickname, targetUser.tag);
-            }, 500);
-          }
-        }
-        
-      } catch (error) {
-        console.error('Ошибка загрузки:', error);
-        usersList.innerHTML = '<div class="error">Ошибка загрузки</div>';
+        newUnreadCounts[otherUserId] = messagesSnapshot.size;
       }
     }
+    
+    unreadCounts = newUnreadCounts;
+
+    // 4. Формируем список пользователей для отображения
+    allUsers = []; // полный список для поиска
+    const chatUsers = []; // только с чатами
+
+    allUsersMap.forEach((user, id) => {
+      allUsers.push(user);
+      if (chatUserIds.has(id)) {
+        chatUsers.push({
+          ...user,
+          lastMessageTime: lastMessageTimes[id] // добавляем время последнего сообщения
+        });
+      }
+    });
+
+    // 5. Сортируем пользователей: сначала с непрочитанными, потом по времени последнего сообщения, потом по алфавиту
+    chatUsers.sort((a, b) => {
+      const unreadA = unreadCounts[a.id] || 0;
+      const unreadB = unreadCounts[b.id] || 0;
+      
+      // Сначала по количеству непрочитанных (от большего к меньшему)
+      if (unreadB !== unreadA) {
+        return unreadB - unreadA;
+      }
+      
+      // Потом по времени последнего сообщения (от новых к старым)
+      const timeA = a.lastMessageTime ? a.lastMessageTime.toDate?.() || new Date(a.lastMessageTime) : new Date(0);
+      const timeB = b.lastMessageTime ? b.lastMessageTime.toDate?.() || new Date(b.lastMessageTime) : new Date(0);
+      
+      if (timeB - timeA !== 0) {
+        return timeB - timeA;
+      }
+      
+      // Потом по алфавиту
+      return (a.nickname || '').localeCompare(b.nickname || '');
+    });
+
+    // 6. Отображаем пользователей с чатами
+    if (chatUsers.length === 0) {
+      usersList.innerHTML = '<div class="no-users">Нет активных чатов. Найдите пользователя через поиск.</div>';
+    } else {
+      displayUsers(chatUsers);
+    }
+
+    // Сохраняем полный список для поиска
+    window.allUsers = allUsers;
+
+    // Проверяем, есть ли параметр userId в URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const targetUserId = urlParams.get('userId');
+
+    if (targetUserId) {
+      // Ищем пользователя в allUsers
+      const targetUser = allUsers.find(u => u.id === targetUserId);
+      if (targetUser) {
+        setTimeout(() => {
+          selectUser(targetUser.id, targetUser.nickname, targetUser.tag);
+        }, 500);
+      }
+    }
+    
+  } catch (error) {
+    console.error('Ошибка загрузки:', error);
+    usersList.innerHTML = '<div class="error">Ошибка загрузки</div>';
+  }
+}
 
     function displayUsers(users) {
       const usersList = document.getElementById('usersList');
@@ -367,34 +390,61 @@
     }
 
     // ---------- Загрузка сообщений ----------
-    function loadMessages() {
-      if (!currentChatId) return;
-      const messagesContainer = document.getElementById('messagesContainer');
-      
-      unsubscribeMessages = db.collection('chats').doc(currentChatId)
-        .collection('messages')
-        .orderBy('timestamp', 'asc')
-        .onSnapshot(snapshot => {
-          if (snapshot.empty) {
-            messagesContainer.innerHTML = '<div class="no-messages">Нет сообщений. Напишите что-нибудь!</div>';
-            return;
-          }
-          
-          let html = '';
-          snapshot.forEach(doc => {
-            const msg = doc.data();
-            const isMyMessage = msg.senderId === currentUser.uid;
-            const time = msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-            
-            // Если сообщение не от меня и не прочитано, помечаем как прочитанное
-if (!isMyMessage && !msg.read) {
-  doc.ref.update({ read: true });
+    // ---------- Загрузка сообщений ----------
+function loadMessages() {
+  if (!currentChatId) return;
+  const messagesContainer = document.getElementById('messagesContainer');
   
-  // Обновляем счетчик непрочитанных для этого пользователя
-  if (unreadCounts[selectedUser.id] > 0) {
-    unreadCounts[selectedUser.id]--;
-    loadUsers(); // Обновляем список пользователей
-  }
+  unsubscribeMessages = db.collection('chats').doc(currentChatId)
+    .collection('messages')
+    .orderBy('timestamp', 'asc')
+    .onSnapshot(snapshot => {
+      if (snapshot.empty) {
+        messagesContainer.innerHTML = '<div class="no-messages">Нет сообщений. Напишите что-нибудь!</div>';
+        return;
+      }
+      
+      // Проверяем, есть ли новые сообщения от собеседника
+      let hasNewMessageFromOther = false;
+      
+      snapshot.docChanges().forEach(change => {
+        if (change.type === 'added') {
+          const msg = change.doc.data();
+          // Если сообщение от собеседника и оно новое (только что добавленное)
+          if (msg.senderId === selectedUser.id) {
+            hasNewMessageFromOther = true;
+          }
+        }
+      });
+      
+      let html = '';
+      snapshot.forEach(doc => {
+        const msg = doc.data();
+        const isMyMessage = msg.senderId === currentUser.uid;
+        const time = msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+        
+        // Если сообщение не от меня и не прочитано, помечаем как прочитанное
+        if (!isMyMessage && !msg.read) {
+          doc.ref.update({ read: true });
+        }
+        
+        html += `
+          <div class="message ${isMyMessage ? 'my-message' : 'other-message'}">
+            <div class="message-content">${msg.text}</div>
+            <div class="message-time">${time}</div>
+          </div>
+        `;
+      });
+      
+      messagesContainer.innerHTML = html;
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      
+      // Если есть новое сообщение от собеседника, обновляем список пользователей
+      if (hasNewMessageFromOther) {
+        loadUsers();
+      }
+      
+    }, error => console.error('Ошибка загрузки сообщений:', error));
 }
             
             html += `
@@ -410,7 +460,7 @@ if (!isMyMessage && !msg.read) {
         }, error => console.error('Ошибка загрузки сообщений:', error));
     }
 
-    // ---------- Отправка сообщения ----------
+// ---------- Отправка сообщения ----------
 async function sendMessage() {
   const input = document.getElementById('messageInput');
   const text = input.value.trim();
@@ -433,11 +483,8 @@ async function sendMessage() {
       lastMessageTime: firebase.firestore.FieldValue.serverTimestamp()
     });
     
-    // После отправки сообщения обновляем список пользователей,
-    // чтобы этот чат поднялся наверх
-    setTimeout(() => {
-      loadUsers();
-    }, 300);
+    // Обновляем список пользователей у себя, чтобы этот чат поднялся наверх
+    loadUsers();
     
   } catch (error) {
     console.error('Ошибка отправки:', error);
