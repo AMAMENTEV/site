@@ -72,6 +72,7 @@
         <input type="text" id="groupName" placeholder="Название беседы" class="modal-input">
         <div class="group-participants">
           <h4>Выберите участников:</h4>
+          <input type="text" id="searchUsersInCreate" placeholder="Поиск пользователей..." class="search-input" onkeyup="searchUsersInCreate()">
           <div id="usersListModal" class="users-checkbox-list">
             <!-- Список пользователей загрузится сюда -->
           </div>
@@ -95,9 +96,11 @@
         <div class="group-info-section">
           <h4>Участники:</h4>
           <div id="groupParticipants" class="group-participants-list"></div>
+          <button onclick="leaveCurrentGroup()" id="leaveGroupBtn" class="modal-leave-btn" style="margin-top: 10px; width: 100%;">Покинуть беседу</button>
         </div>
         <div class="group-info-section">
           <h4>Добавить участников:</h4>
+          <input type="text" id="searchUsersToAdd" placeholder="Поиск пользователей..." class="search-input" onkeyup="searchUsersToAdd()">
           <div id="addParticipantsList" class="users-checkbox-list">
             <!-- Список пользователей для добавления -->
           </div>
@@ -205,6 +208,8 @@
     // ---------- Загрузка списка чатов ----------
     async function loadChats() {
       const chatsList = document.getElementById('chatsList');
+      if (!chatsList) return;
+      
       chatsList.innerHTML = '<div class="loading">Загрузка чатов...</div>';
       
       try {
@@ -429,6 +434,112 @@
       document.getElementById('chatsList').innerHTML = resultsHTML;
     }
 
+    // ---------- Поиск пользователей в модальном окне создания беседы ----------
+    function searchUsersInCreate() {
+      const searchText = document.getElementById('searchUsersInCreate').value.toLowerCase();
+      const usersList = document.getElementById('usersListModal');
+      
+      if (!searchText) {
+        // Если поиск пустой, показываем всех
+        displayAllUsersInCreate();
+        return;
+      }
+      
+      const filtered = allUsersForModal.filter(user =>
+        (user.nickname && user.nickname.toLowerCase().includes(searchText)) ||
+        (user.tag && user.tag.toLowerCase().includes(searchText))
+      );
+      
+      if (filtered.length === 0) {
+        usersList.innerHTML = '<div class="no-users">Ничего не найдено</div>';
+        return;
+      }
+      
+      let html = '';
+      filtered.forEach(user => {
+        html += `
+          <label class="user-checkbox">
+            <input type="checkbox" value="${user.id}">
+            <span>${user.nickname} ${user.tag}</span>
+          </label>
+        `;
+      });
+      usersList.innerHTML = html;
+    }
+
+    function displayAllUsersInCreate() {
+      const usersList = document.getElementById('usersListModal');
+      let html = '';
+      allUsersForModal.forEach(user => {
+        html += `
+          <label class="user-checkbox">
+            <input type="checkbox" value="${user.id}">
+            <span>${user.nickname} ${user.tag}</span>
+          </label>
+        `;
+      });
+      usersList.innerHTML = html;
+    }
+
+    // ---------- Поиск пользователей для добавления в беседу ----------
+    function searchUsersToAdd() {
+      if (!selectedChat) return;
+      
+      const searchText = document.getElementById('searchUsersToAdd').value.toLowerCase();
+      const addList = document.getElementById('addParticipantsList');
+      
+      // Показываем только тех пользователей, которых еще нет в чате
+      const nonParticipants = allUsersForModal.filter(user => 
+        !selectedChat.participants.includes(user.id)
+      );
+      
+      if (!searchText) {
+        // Если поиск пустой, показываем всех неучастников
+        displayNonParticipants(nonParticipants);
+        return;
+      }
+      
+      const filtered = nonParticipants.filter(user =>
+        (user.nickname && user.nickname.toLowerCase().includes(searchText)) ||
+        (user.tag && user.tag.toLowerCase().includes(searchText))
+      );
+      
+      if (filtered.length === 0) {
+        addList.innerHTML = '<div class="no-users">Ничего не найдено</div>';
+        return;
+      }
+      
+      let html = '';
+      filtered.forEach(user => {
+        html += `
+          <label class="user-checkbox">
+            <input type="checkbox" value="${user.id}">
+            <span>${user.nickname} ${user.tag}</span>
+          </label>
+        `;
+      });
+      addList.innerHTML = html;
+    }
+
+    function displayNonParticipants(nonParticipants) {
+      const addList = document.getElementById('addParticipantsList');
+      if (nonParticipants.length === 0) {
+        addList.innerHTML = '<div class="no-users">Все пользователи уже в беседе</div>';
+        return;
+      }
+      
+      let html = '';
+      nonParticipants.forEach(user => {
+        html += `
+          <label class="user-checkbox">
+            <input type="checkbox" value="${user.id}">
+            <span>${user.nickname} ${user.tag}</span>
+          </label>
+        `;
+      });
+      addList.innerHTML = html;
+    }
+
     // ---------- Создание личного чата с новым пользователем ----------
     async function createPrivateChat(userId, nickname, tag) {
       try {
@@ -619,7 +730,7 @@
           if (selectedChat && selectedChat.isGroup) {
             snapshot.forEach(doc => {
               const msg = doc.data();
-              if (msg.senderId !== currentUser.uid) {
+              if (msg.senderId !== currentUser.uid && !msg.isSystem) {
                 senderIds.add(msg.senderId);
               }
             });
@@ -650,6 +761,16 @@
               }
             }
             
+            // Для системных сообщений
+            if (msg.isSystem) {
+              html += `
+                <div class="message system">
+                  <div class="message-content">${msg.text}</div>
+                </div>
+              `;
+              return;
+            }
+            
             // Для группового чата показываем имя отправителя
             let senderInfo = '';
             if (selectedChat && selectedChat.isGroup && !isMyMessage) {
@@ -661,7 +782,7 @@
             
             // Добавляем возможность удаления только для своих сообщений
             const deleteOption = isMyMessage ? 
-              `<button class="message-delete-btn" onclick="showMessageOptions('${doc.id}', ${JSON.stringify(msg).replace(/'/g, "\\'")})">⋯</button>` : '';
+              `<button class="message-delete-btn" onclick="showMessageOptions('${doc.id}', event)">⋯</button>` : '';
             
             html += `
               <div class="message ${isMyMessage ? 'my-message' : 'other-message'}" id="msg-${doc.id}">
@@ -757,35 +878,18 @@
       const usersList = document.getElementById('usersListModal');
       if (!usersList) return;
       
+      document.getElementById('searchUsersInCreate').value = '';
+      
       if (allUsersForModal.length === 0) {
         usersList.innerHTML = '<div class="no-users">Загрузка пользователей...</div>';
         loadAllUsersForModal().then(() => {
-          displayUsersInModal();
+          displayAllUsersInCreate();
         });
       } else {
-        displayUsersInModal();
+        displayAllUsersInCreate();
       }
       
       document.getElementById('createGroupModal').style.display = 'flex';
-    }
-    
-    function displayUsersInModal() {
-      const usersList = document.getElementById('usersListModal');
-      if (allUsersForModal.length === 0) {
-        usersList.innerHTML = '<div class="no-users">Нет других пользователей</div>';
-        return;
-      }
-      
-      let html = '';
-      allUsersForModal.forEach(user => {
-        html += `
-          <label class="user-checkbox">
-            <input type="checkbox" value="${user.id}">
-            <span>${user.nickname} ${user.tag}</span>
-          </label>
-        `;
-      });
-      usersList.innerHTML = html;
     }
 
     function hideCreateGroupModal() {
@@ -847,7 +951,11 @@
           const userData = await getUserById(userId);
           if (userData) {
             const isCreator = userId === chat.createdBy ? ' (создатель)' : '';
-            participantsHTML += `<li>${userData.nickname} ${userData.tag}${isCreator}</li>`;
+            const canRemove = userId !== currentUser.uid && userId !== chat.createdBy;
+            participantsHTML += `<li>
+              ${userData.nickname} ${userData.tag}${isCreator}
+              ${canRemove ? `<button class="remove-participant-btn" onclick="removeParticipant('${userId}')">×</button>` : ''}
+            </li>`;
           }
         }
         participantsHTML += '</ul>';
@@ -855,26 +963,18 @@
         document.getElementById('groupInfoName').textContent = chat.name || 'Беседа';
         document.getElementById('groupParticipants').innerHTML = participantsHTML;
         
-        // Загружаем список пользователей для добавления
-        const addList = document.getElementById('addParticipantsList');
-        let addHTML = '';
-        
-        // Показываем только тех пользователей, которых еще нет в чате
-        const nonParticipants = allUsersForModal.filter(user => !chat.participants.includes(user.id));
-        
-        if (nonParticipants.length === 0) {
-          addHTML = '<div class="no-users">Все пользователи уже в беседе</div>';
+        // Показываем/скрываем кнопку выхода
+        const leaveBtn = document.getElementById('leaveGroupBtn');
+        if (chat.createdBy === currentUser.uid) {
+          leaveBtn.style.display = 'none'; // Создатель не может выйти, только удалить
         } else {
-          nonParticipants.forEach(user => {
-            addHTML += `
-              <label class="user-checkbox">
-                <input type="checkbox" value="${user.id}">
-                <span>${user.nickname} ${user.tag}</span>
-              </label>
-            `;
-          });
+          leaveBtn.style.display = 'block';
         }
-        addList.innerHTML = addHTML;
+        
+        // Загружаем список пользователей для добавления
+        document.getElementById('searchUsersToAdd').value = '';
+        const nonParticipants = allUsersForModal.filter(user => !chat.participants.includes(user.id));
+        displayNonParticipants(nonParticipants);
         
         // Показываем кнопку удаления только создателю
         const deleteBtn = document.getElementById('deleteGroupBtn');
@@ -888,6 +988,41 @@
         
       } catch (error) {
         console.error('Ошибка загрузки информации о беседе:', error);
+      }
+    }
+
+    async function removeParticipant(userId) {
+      if (!selectedChat || !selectedChat.isGroup) return;
+      
+      if (!confirm('Удалить этого участника из беседы?')) return;
+      
+      try {
+        // Удаляем участника
+        await db.collection('chats').doc(selectedChat.id).update({
+          participants: firebase.firestore.FieldValue.arrayRemove(userId)
+        });
+        
+        // Отправляем системное сообщение
+        const userData = await getUserById(userId);
+        if (userData) {
+          await db.collection('chats').doc(selectedChat.id)
+            .collection('messages')
+            .add({
+              text: `❌ ${userData.nickname} ${userData.tag} удален из беседы`,
+              senderId: 'system',
+              timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+              read: false,
+              isSystem: true
+            });
+        }
+        
+        // Обновляем информацию
+        openChatInfo(selectedChat.id);
+        loadChats();
+        
+      } catch (error) {
+        console.error('Ошибка удаления участника:', error);
+        alert('Ошибка при удалении участника');
       }
     }
 
@@ -938,6 +1073,41 @@
       }
     }
 
+    async function leaveCurrentGroup() {
+      if (!selectedChat || !selectedChat.isGroup) return;
+      
+      if (!confirm('Вы уверены, что хотите покинуть беседу?')) return;
+      
+      try {
+        // Отправляем системное сообщение
+        await db.collection('chats').doc(selectedChat.id)
+          .collection('messages')
+          .add({
+            text: `👋 ${currentUserData.nickname} ${currentUserData.tag} покинул беседу`,
+            senderId: 'system',
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            read: false,
+            isSystem: true
+          });
+        
+        // Удаляем пользователя из участников
+        await db.collection('chats').doc(selectedChat.id).update({
+          participants: firebase.firestore.FieldValue.arrayRemove(currentUser.uid)
+        });
+        
+        hideGroupInfoModal();
+        
+        // Возвращаемся в режим выбора чата
+        exitChatMode();
+        
+        alert('Вы покинули беседу');
+        
+      } catch (error) {
+        console.error('Ошибка при выходе из беседы:', error);
+        alert('Ошибка при выходе из беседы');
+      }
+    }
+
     function hideGroupInfoModal() {
       document.getElementById('groupInfoModal').style.display = 'none';
     }
@@ -977,13 +1147,21 @@
     }
 
     // ---------- Удаление сообщений ----------
-    function showMessageOptions(messageId, messageData) {
+    function showMessageOptions(messageId, event) {
+      if (event) {
+        event.stopPropagation();
+      }
       selectedMessageId = messageId;
-      selectedMessageData = messageData;
+      
+      // Получаем данные сообщения
+      const msgElement = document.getElementById(`msg-${messageId}`);
+      if (!msgElement) return;
+      
+      const isMyMessage = msgElement.classList.contains('my-message');
       
       // Показываем кнопку "Удалить у всех" только для своих сообщений
       const deleteForEveryoneBtn = document.getElementById('deleteForEveryoneBtn');
-      if (messageData.senderId === currentUser.uid) {
+      if (isMyMessage) {
         deleteForEveryoneBtn.style.display = 'block';
       } else {
         deleteForEveryoneBtn.style.display = 'none';
@@ -995,7 +1173,6 @@
     function hideMessageOptions() {
       document.getElementById('messageOptionsModal').style.display = 'none';
       selectedMessageId = null;
-      selectedMessageData = null;
     }
 
     async function deleteMessageForMe() {

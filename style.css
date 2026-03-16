@@ -2057,3 +2057,65 @@ body {
 .participants-list li:last-child {
   border-bottom: none;
 }
+
+/* ========== СТИЛИ ДЛЯ ПОИСКА В МОДАЛЬНЫХ ОКНАХ ========== */
+.search-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 30px;
+  font-size: 0.95rem;
+  margin-bottom: 12px;
+  background: #f8fafc;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  background: white;
+}
+
+/* ========== СТИЛИ ДЛЯ УДАЛЕНИЯ УЧАСТНИКОВ ========== */
+.remove-participant-btn {
+  background: none;
+  border: none;
+  color: #999;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0 6px;
+  margin-left: 8px;
+  border-radius: 4px;
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.remove-participant-btn:hover {
+  color: #dc2626;
+  background: #fee2e2;
+}
+
+.participants-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+}
+
+/* ========== СТИЛИ ДЛЯ КНОПКИ ВЫХОДА ИЗ БЕСЕДЫ ========== */
+.modal-leave-btn {
+  padding: 10px 20px;
+  background: #f1f5f9;
+  color: #64748b;
+  border: none;
+  border-radius: 30px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.modal-leave-btn:hover {
+  background: #e2e8f0;
+  color: #475569;
+}
