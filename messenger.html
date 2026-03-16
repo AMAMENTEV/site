@@ -21,26 +21,26 @@
       </div>
     </div>
 
-    <!-- Вторая колонка - список чатов -->
-    <div class="chats-sidebar" id="chatsSidebar">
-      <div class="chats-header">
-        <h2>Чаты</h2>
-        <p>Личные и групповые</p>
+    <!-- Вторая колонка - список пользователей -->
+    <div class="users-sidebar" id="usersSidebar">
+      <div class="users-header">
+        <h2>Пользователи</h2>
+        <p>С кем есть чат</p>
       </div>
 
       <div class="search-box">
-        <input type="text" id="searchInput" placeholder="Поиск по чатам..." onkeyup="searchChats()">
+        <input type="text" id="searchInput" placeholder="Поиск по нику или тегу..." onkeyup="searchUsers()">
       </div>
 
-      <div class="chats-list" id="chatsList">
-        <div class="loading">Загрузка чатов...</div>
+      <div class="users-list" id="usersList">
+        <div class="loading">Загрузка пользователей...</div>
       </div>
     </div>
 
     <!-- Третья колонка - чат -->
     <div class="chat-area" id="chatArea">
       <div class="chat-header" id="chatHeader">
-        <div class="no-chat-selected" id="noChatMessage">Выберите чат для начала общения</div>
+        <div class="no-chat-selected" id="noChatMessage">Выберите пользователя для начала чата</div>
       </div>
 
       <div class="messages-container" id="messagesContainer"></div>
@@ -72,7 +72,7 @@
         <input type="text" id="groupName" placeholder="Название беседы" class="modal-input">
         <div class="group-participants">
           <h4>Выберите участников:</h4>
-          <div id="usersList" class="users-checkbox-list">
+          <div id="usersListModal" class="users-checkbox-list">
             <!-- Список пользователей загрузится сюда -->
           </div>
         </div>
@@ -89,15 +89,15 @@
     // ---------- Глобальные переменные ----------
     let currentUser = null;
     let currentUserData = null;
-    let selectedChat = null;
+    let selectedUser = null;
     let currentChatId = null;
     let unsubscribeMessages = null;
-    let allChats = [];
     let allUsers = [];
-    
-    // Объект для хранения количества непрочитанных сообщений по каждому чату
-    let unreadCounts = {};
+    let allUsersForModal = [];
     let isChatMode = false;
+    
+    // Объект для хранения количества непрочитанных сообщений по каждому пользователю
+    let unreadCounts = {};
 
     // ---------- Проверка авторизации ----------
     auth.onAuthStateChanged(async (user) => {
@@ -115,7 +115,7 @@
       } catch (error) {
         console.error('Ошибка загрузки пользователя:', error);
       }
-      loadChats();
+      loadUsers();
       loadAllUsersForModal();
       
       // Запускаем глобальное прослушивание новых сообщений
@@ -126,10 +126,10 @@
     async function loadAllUsersForModal() {
       try {
         const snapshot = await db.collection('users').get();
-        allUsers = [];
+        allUsersForModal = [];
         snapshot.forEach(doc => {
           if (doc.id !== currentUser.uid) {
-            allUsers.push({ id: doc.id, ...doc.data() });
+            allUsersForModal.push({ id: doc.id, ...doc.data() });
           }
         });
       } catch (error) {
@@ -137,92 +137,79 @@
       }
     }
 
-    // ---------- Загрузка списка чатов ----------
-    async function loadChats() {
-      const chatsList = document.getElementById('chatsList');
-      if (!chatsList) return;
-      
-      chatsList.innerHTML = '<div class="loading">Загрузка чатов...</div>';
+    // ---------- Загрузка списка пользователей ----------
+    async function loadUsers() {
+      const usersList = document.getElementById('usersList');
+      usersList.innerHTML = '<div class="loading">Загрузка пользователей...</div>';
       
       try {
-        // Получаем все чаты текущего пользователя
+        // 1. Получаем всех пользователей из Firestore
+        const usersSnapshot = await db.collection('users').get();
+        const allUsersMap = new Map();
+        usersSnapshot.forEach(doc => {
+          if (doc.id !== currentUser.uid) {
+            allUsersMap.set(doc.id, { id: doc.id, ...doc.data() });
+          }
+        });
+
+        // 2. Получаем все чаты текущего пользователя
         const chatsSnapshot = await db.collection('chats')
           .where('participants', 'array-contains', currentUser.uid)
           .get();
 
-        allChats = [];
-        const newUnreadCounts = {};
+        // 3. Собираем ID пользователей, с которыми есть чаты
+        const chatUserIds = new Set();
+        const chatIds = new Map(); // для хранения id чата для каждого пользователя
         
         for (const doc of chatsSnapshot.docs) {
           const chat = doc.data();
-          
-          // Определяем название чата
-          let chatName = chat.name;
-          let chatAvatar = '';
-          
           if (!chat.isGroup) {
-            // Личный чат - находим имя собеседника
+            // Только личные чаты
             const otherUserId = chat.participants.find(id => id !== currentUser.uid);
-            const otherUser = await getUserById(otherUserId);
-            chatName = otherUser ? otherUser.nickname : 'Пользователь';
-            chatAvatar = otherUser ? otherUser.tag : '';
-          }
-          
-          // Получаем количество непрочитанных сообщений
-          const messagesSnapshot = await db.collection('chats').doc(doc.id)
-            .collection('messages')
-            .where('read', '==', false)
-            .get();
-          
-          // Считаем только те сообщения, которые адресованы текущему пользователю
-          let unreadCount = 0;
-          messagesSnapshot.forEach(msgDoc => {
-            const msg = msgDoc.data();
-            if (msg.receiverId === currentUser.uid || !msg.receiverId) {
-              unreadCount++;
+            if (otherUserId) {
+              chatUserIds.add(otherUserId);
+              chatIds.set(otherUserId, doc.id);
             }
-          });
-          
-          newUnreadCounts[doc.id] = unreadCount;
-          
-          allChats.push({
-            id: doc.id,
-            ...chat,
-            displayName: chatName,
-            displayTag: chatAvatar,
-            lastMessageTime: chat.lastMessageTime ? chat.lastMessageTime.toDate?.() || new Date(chat.lastMessageTime) : new Date(0)
-          });
-        }
-        
-        unreadCounts = newUnreadCounts;
-
-        // Сортируем чаты: сначала с непрочитанными, потом по времени последнего сообщения
-        allChats.sort((a, b) => {
-          const unreadA = unreadCounts[a.id] || 0;
-          const unreadB = unreadCounts[b.id] || 0;
-          
-          if (unreadB !== unreadA) {
-            return unreadB - unreadA;
           }
-          
-          return b.lastMessageTime - a.lastMessageTime;
+        }
+
+        // 4. Формируем список пользователей для отображения
+        allUsers = [];
+        const chatUsers = [];
+
+        allUsersMap.forEach((user, id) => {
+          allUsers.push(user);
+          if (chatUserIds.has(id)) {
+            chatUsers.push({
+              ...user,
+              chatId: chatIds.get(id)
+            });
+          }
         });
 
-        if (allChats.length === 0) {
-          chatsList.innerHTML = '<div class="no-chats">У вас пока нет чатов. Создайте беседу или напишите кому-нибудь.</div>';
+        // 5. Сортируем пользователей по алфавиту
+        chatUsers.sort((a, b) => (a.nickname || '').localeCompare(b.nickname || ''));
+
+        // 6. Отображаем пользователей с чатами
+        if (chatUsers.length === 0) {
+          usersList.innerHTML = '<div class="no-users">Нет активных чатов. Создайте беседу или найдите пользователя через поиск.</div>';
         } else {
-          displayChats(allChats);
+          displayUsers(chatUsers);
         }
 
-        // Проверяем, есть ли параметр chatId в URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const targetChatId = urlParams.get('chatId');
+        // Сохраняем полный список для поиска
+        window.allUsers = allUsers;
 
-        if (targetChatId) {
-          const targetChat = allChats.find(c => c.id === targetChatId);
-          if (targetChat) {
+        // Проверяем, есть ли параметр userId в URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const targetUserId = urlParams.get('userId');
+
+        if (targetUserId) {
+          // Ищем пользователя в allUsers
+          const targetUser = allUsers.find(u => u.id === targetUserId);
+          if (targetUser) {
             setTimeout(() => {
-              selectChat(targetChat.id, targetChat.displayName, targetChat.displayTag, targetChat.isGroup, targetChat.participants);
+              selectUser(targetUser.id, targetUser.nickname, targetUser.tag, chatIds.get(targetUserId));
               const newUrl = window.location.pathname;
               window.history.replaceState({}, document.title, newUrl);
             }, 500);
@@ -230,97 +217,126 @@
         }
         
       } catch (error) {
-        console.error('Ошибка загрузки чатов:', error);
-        chatsList.innerHTML = '<div class="error">Ошибка загрузки чатов</div>';
+        console.error('Ошибка загрузки:', error);
+        usersList.innerHTML = '<div class="error">Ошибка загрузки</div>';
       }
     }
 
-    async function getUserById(userId) {
-      try {
-        const userDoc = await db.collection('users').doc(userId).get();
-        return userDoc.exists ? userDoc.data() : null;
-      } catch (error) {
-        console.error('Ошибка загрузки пользователя:', error);
-        return null;
-      }
-    }
-
-    function displayChats(chats) {
-      const chatsList = document.getElementById('chatsList');
+    function displayUsers(users) {
+      const usersList = document.getElementById('usersList');
       
-      chatsList.innerHTML = chats.map(chat => {
-        const firstLetter = chat.displayName ? chat.displayName.charAt(0).toUpperCase() : '?';
-        const unreadCount = unreadCounts[chat.id] || 0;
+      usersList.innerHTML = users.map(user => {
+        const firstLetter = user.nickname ? user.nickname.charAt(0).toUpperCase() : '?';
+        const tag = user.tag || '';
+        const nickname = user.nickname || 'Без имени';
+        const unreadCount = unreadCounts[user.id] || 0;
         const unreadBadge = unreadCount > 0 ? `<span class="unread-badge">${unreadCount}</span>` : '';
-        const groupIcon = chat.isGroup ? '👥 ' : '';
-        const lastMessage = chat.lastMessage || 'Нет сообщений';
         
         return `
-          <div class="chat-item ${unreadCount > 0 ? 'has-unread' : ''}" onclick="selectChat('${chat.id}', '${chat.displayName.replace(/'/g, "\\'")}', '${chat.displayTag || ''}', ${chat.isGroup || false}, ${JSON.stringify(chat.participants).replace(/'/g, "\\'")})">
-            <div class="chat-avatar-placeholder">${groupIcon}${firstLetter}</div>
-            <div class="chat-info">
-              <div class="chat-name">${chat.displayName} ${unreadBadge}</div>
-              <div class="chat-last-message">${lastMessage.length > 30 ? lastMessage.substring(0, 30) + '...' : lastMessage}</div>
+          <div class="user-item ${unreadCount > 0 ? 'has-unread' : ''}" onclick="selectUser('${user.id}', '${nickname.replace(/'/g, "\\'")}', '${tag.replace(/'/g, "\\'")}', '${user.chatId}')">
+            <div class="user-avatar-placeholder">${firstLetter}</div>
+            <div class="user-info">
+              <div class="user-name">${nickname} ${unreadBadge}</div>
+              <div class="user-tag">${tag}</div>
             </div>
           </div>
         `;
       }).join('');
     }
 
-    function searchChats() {
+    function searchUsers() {
       const searchText = document.getElementById('searchInput').value.toLowerCase();
       
       if (!searchText) {
-        displayChats(allChats);
+        loadUsers();
         return;
       }
       
-      const filtered = allChats.filter(chat =>
-        chat.displayName.toLowerCase().includes(searchText)
+      // Ищем по всем пользователям
+      const filtered = window.allUsers.filter(user =>
+        (user.nickname && user.nickname.toLowerCase().includes(searchText)) ||
+        (user.tag && user.tag.toLowerCase().includes(searchText))
       );
       
       if (filtered.length === 0) {
-        document.getElementById('chatsList').innerHTML = '<div class="no-chats">Ничего не найдено</div>';
+        document.getElementById('usersList').innerHTML = '<div class="no-users">Ничего не найдено</div>';
       } else {
-        displayChats(filtered);
+        // Для поиска показываем всех найденных, но сортируем по алфавиту
+        filtered.sort((a, b) => (a.nickname || '').localeCompare(b.nickname || ''));
+        
+        const tempHTML = filtered.map(user => {
+          const firstLetter = user.nickname ? user.nickname.charAt(0).toUpperCase() : '?';
+          const tag = user.tag || '';
+          const nickname = user.nickname || 'Без имени';
+          
+          return `
+            <div class="user-item" onclick="createPrivateChat('${user.id}', '${nickname.replace(/'/g, "\\'")}', '${tag.replace(/'/g, "\\'")}')">
+              <div class="user-avatar-placeholder">${firstLetter}</div>
+              <div class="user-info">
+                <div class="user-name">${nickname}</div>
+                <div class="user-tag">${tag}</div>
+              </div>
+            </div>
+          `;
+        }).join('');
+        
+        document.getElementById('usersList').innerHTML = tempHTML;
       }
     }
 
-    // ---------- Выбор чата ----------
-    function selectChat(chatId, chatName, chatTag, isGroup, participants) {
-      selectedChat = { id: chatId, name: chatName, tag: chatTag, isGroup, participants };
+    // ---------- Создание личного чата с новым пользователем ----------
+    async function createPrivateChat(userId, nickname, tag) {
+      try {
+        // Проверяем, есть ли уже чат
+        const chatsSnapshot = await db.collection('chats')
+          .where('participants', 'array-contains', currentUser.uid)
+          .get();
+        
+        let existingChatId = null;
+        chatsSnapshot.forEach(doc => {
+          const chat = doc.data();
+          if (!chat.isGroup && chat.participants.includes(userId)) {
+            existingChatId = doc.id;
+          }
+        });
+        
+        if (existingChatId) {
+          // Чат уже существует
+          selectUser(userId, nickname, tag, existingChatId);
+        } else {
+          // Создаем новый чат
+          const newChat = await db.collection('chats').add({
+            participants: [currentUser.uid, userId],
+            isGroup: false,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            lastMessage: null,
+            lastMessageTime: null
+          });
+          selectUser(userId, nickname, tag, newChat.id);
+        }
+      } catch (error) {
+        console.error('Ошибка создания чата:', error);
+        alert('Ошибка при создании чата');
+      }
+    }
+
+    // ---------- Выбор пользователя для чата ----------
+    function selectUser(userId, nickname, tag, chatId) {
+      selectedUser = { id: userId, nickname, tag, chatId };
       currentChatId = chatId;
 
       const chatHeader = document.getElementById('chatHeader');
-      
-      let headerContent = '';
-      if (isGroup) {
-        const participantsCount = participants ? participants.length : 2;
-        headerContent = `
-          <div class="selected-chat" onclick="openChatInfo('${chatId}')">
-            <button class="mobile-back-btn" onclick="event.stopPropagation(); exitChatMode()"><</button>
-            <div class="chat-avatar-placeholder large">👥 ${chatName.charAt(0).toUpperCase()}</div>
-            <div class="chat-info">
-              <h3>${chatName}</h3>
-              <p>${participantsCount} участников</p>
-            </div>
+      chatHeader.innerHTML = `
+        <div class="selected-user" onclick="openUserProfile('${userId}')">
+          <button class="mobile-back-btn" onclick="event.stopPropagation(); exitChatMode()"><</button>
+          <div class="chat-user-avatar-placeholder">${nickname.charAt(0).toUpperCase()}</div>
+          <div class="chat-user-info">
+            <h3>${nickname}</h3>
+            <p>${tag}</p>
           </div>
-        `;
-      } else {
-        const otherUserId = participants.find(id => id !== currentUser.uid);
-        headerContent = `
-          <div class="selected-chat" onclick="openUserProfile('${otherUserId}')">
-            <button class="mobile-back-btn" onclick="event.stopPropagation(); exitChatMode()"><</button>
-            <div class="chat-avatar-placeholder large">${chatName.charAt(0).toUpperCase()}</div>
-            <div class="chat-info">
-              <h3>${chatName}</h3>
-              <p>${chatTag}</p>
-            </div>
-          </div>
-        `;
-      }
-      
-      chatHeader.innerHTML = headerContent;
+        </div>
+      `;
+
       document.getElementById('messageInputArea').style.display = 'flex';
 
       if (window.innerWidth <= 768) {
@@ -329,36 +345,95 @@
 
       loadMessages();
       
-      // Сбрасываем счетчик непрочитанных для этого чата
-      if (unreadCounts[chatId] > 0) {
-        markMessagesAsRead(chatId);
+      // Сбрасываем счетчик непрочитанных для этого пользователя
+      if (unreadCounts[userId] > 0) {
+        markMessagesAsRead(userId);
       }
     }
 
     // ---------- Отметить сообщения как прочитанные ----------
-    async function markMessagesAsRead(chatId) {
+    async function markMessagesAsRead(userId) {
+      if (!currentChatId) return;
+      
       try {
-        const unreadSnapshot = await db.collection('chats').doc(chatId)
+        const unreadSnapshot = await db.collection('chats').doc(currentChatId)
           .collection('messages')
           .where('read', '==', false)
+          .where('receiverId', '==', currentUser.uid)
           .get();
         
         const batch = db.batch();
         unreadSnapshot.forEach(doc => {
-          const msg = doc.data();
-          // Отмечаем как прочитанные только те, которые адресованы текущему пользователю
-          if (msg.receiverId === currentUser.uid || !msg.receiverId) {
-            batch.update(doc.ref, { read: true });
-          }
+          batch.update(doc.ref, { read: true });
         });
         
         await batch.commit();
         
-        unreadCounts[chatId] = 0;
-        loadChats();
+        // Обновляем счетчик
+        unreadCounts[userId] = 0;
+        
+        // Обновляем отображение списка пользователей
+        loadUsers();
         
       } catch (error) {
         console.error('Ошибка при отметке сообщений как прочитанных:', error);
+      }
+    }
+
+    function openUserProfile(userId) {
+      window.location.href = `user.html?id=${userId}`;
+    }
+
+    // ---------- Переключение режимов на мобилках ----------
+    function enterChatMode() {
+      isChatMode = true;
+      document.body.classList.add('chat-mode');
+      document.getElementById('mobileMenuBtn').style.display = 'none';
+    }
+
+    function exitChatMode() {
+      isChatMode = false;
+      document.body.classList.remove('chat-mode');
+      document.getElementById('mobileMenuBtn').style.display = 'flex';
+
+      if (unsubscribeMessages) {
+        unsubscribeMessages();
+        unsubscribeMessages = null;
+      }
+      selectedUser = null;
+      currentChatId = null;
+      document.getElementById('chatHeader').innerHTML = '<div class="no-chat-selected">Выберите пользователя для начала чата</div>';
+      document.getElementById('messagesContainer').innerHTML = '';
+      document.getElementById('messageInputArea').style.display = 'none';
+    }
+
+    // ---------- Создание/получение чата ----------
+    async function createOrGetChat() {
+      if (unsubscribeMessages) unsubscribeMessages();
+      try {
+        const chatsSnapshot = await db.collection('chats')
+          .where('participants', 'array-contains', currentUser.uid)
+          .get();
+        let chatId = null;
+        chatsSnapshot.forEach(doc => {
+          const chat = doc.data();
+          if (chat.participants.includes(selectedUser.id)) chatId = doc.id;
+        });
+        if (chatId) {
+          currentChatId = chatId;
+        } else {
+          const newChat = await db.collection('chats').add({
+            participants: [currentUser.uid, selectedUser.id],
+            isGroup: false,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            lastMessage: null,
+            lastMessageTime: null
+          });
+          currentChatId = newChat.id;
+        }
+        loadMessages();
+      } catch (error) {
+        console.error('Ошибка создания чата:', error);
       }
     }
 
@@ -374,12 +449,13 @@
       unsubscribeMessages = db.collection('chats').doc(currentChatId)
         .collection('messages')
         .orderBy('timestamp', 'asc')
-        .onSnapshot(async snapshot => {
+        .onSnapshot(snapshot => {
           if (snapshot.empty) {
             messagesContainer.innerHTML = '<div class="no-messages">Нет сообщений. Напишите что-нибудь!</div>';
             return;
           }
           
+          // Проверяем, есть ли новые сообщения от собеседника
           let hasNewMessageFromOther = false;
           
           snapshot.docChanges().forEach(change => {
@@ -392,37 +468,10 @@
           });
           
           let html = '';
-          
-          // Собираем информацию об отправителях для группового чата
-          const senderIds = new Set();
-          snapshot.forEach(doc => {
-            const msg = doc.data();
-            if (selectedChat.isGroup && msg.senderId !== currentUser.uid) {
-              senderIds.add(msg.senderId);
-            }
-          });
-          
-          const userCache = {};
-          for (const id of senderIds) {
-            const userData = await getUserById(id);
-            if (userData) {
-              userCache[id] = userData;
-            }
-          }
-          
           snapshot.forEach(doc => {
             const msg = doc.data();
             const isMyMessage = msg.senderId === currentUser.uid;
             const time = msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-            
-            // Получаем информацию об отправителе для группового чата
-            let senderInfo = '';
-            if (selectedChat.isGroup && !isMyMessage) {
-              const sender = userCache[msg.senderId];
-              if (sender) {
-                senderInfo = `<div class="message-sender">${sender.nickname} ${sender.tag}</div>`;
-              }
-            }
             
             // Если сообщение не от меня и не прочитано, помечаем как прочитанное
             if (!isMyMessage && !msg.read) {
@@ -431,7 +480,6 @@
             
             html += `
               <div class="message ${isMyMessage ? 'my-message' : 'other-message'}">
-                ${senderInfo}
                 <div class="message-content">${msg.text}</div>
                 <div class="message-time">${time}</div>
               </div>
@@ -441,8 +489,9 @@
           messagesContainer.innerHTML = html;
           messagesContainer.scrollTop = messagesContainer.scrollHeight;
           
+          // Если есть новое сообщение от собеседника, обновляем список пользователей
           if (hasNewMessageFromOther) {
-            loadChats();
+            loadUsers();
           }
           
         }, error => console.error('Ошибка загрузки сообщений:', error));
@@ -452,33 +501,28 @@
     async function sendMessage() {
       const input = document.getElementById('messageInput');
       const text = input.value.trim();
-      if (!text || !currentChatId || !selectedChat) return;
+      if (!text || !currentChatId || !selectedUser) return;
 
       input.value = '';
 
       try {
-        const messageData = {
-          text: text,
-          senderId: currentUser.uid,
-          timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-          read: false
-        };
-        
-        // В личном чате указываем receiverId
-        if (!selectedChat.isGroup) {
-          messageData.receiverId = selectedChat.participants.find(id => id !== currentUser.uid);
-        }
-        
         await db.collection('chats').doc(currentChatId)
           .collection('messages')
-          .add(messageData);
+          .add({
+            text: text,
+            senderId: currentUser.uid,
+            receiverId: selectedUser.id,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            read: false
+          });
           
         await db.collection('chats').doc(currentChatId).update({
           lastMessage: text,
           lastMessageTime: firebase.firestore.FieldValue.serverTimestamp()
         });
         
-        loadChats();
+        // Обновляем список пользователей
+        loadUsers();
         
       } catch (error) {
         console.error('Ошибка отправки:', error);
@@ -494,8 +538,8 @@
         .onSnapshot(snapshot => {
           snapshot.docChanges().forEach(change => {
             if (change.type === 'modified' || change.type === 'added') {
-              console.log('Chat updated, refreshing chats list');
-              loadChats();
+              console.log('Chat updated, refreshing users list');
+              loadUsers();
             }
           });
         }, error => console.error('Ошибка прослушивания чатов:', error));
@@ -507,7 +551,7 @@
           snapshot.docChanges().forEach(change => {
             if (change.type === 'added') {
               console.log('New unread message received');
-              loadChats();
+              loadUsers();
             }
           });
         }, error => console.error('Ошибка прослушивания сообщений:', error));
@@ -515,11 +559,10 @@
 
     // ---------- Создание группового чата ----------
     function showCreateGroupModal() {
-      // Загружаем пользователей для модального окна
-      const usersList = document.getElementById('usersList');
+      const usersList = document.getElementById('usersListModal');
       if (!usersList) return;
       
-      if (allUsers.length === 0) {
+      if (allUsersForModal.length === 0) {
         usersList.innerHTML = '<div class="no-users">Загрузка пользователей...</div>';
         loadAllUsersForModal().then(() => {
           displayUsersInModal();
@@ -532,14 +575,14 @@
     }
     
     function displayUsersInModal() {
-      const usersList = document.getElementById('usersList');
-      if (allUsers.length === 0) {
+      const usersList = document.getElementById('usersListModal');
+      if (allUsersForModal.length === 0) {
         usersList.innerHTML = '<div class="no-users">Нет других пользователей</div>';
         return;
       }
       
       let html = '';
-      allUsers.forEach(user => {
+      allUsersForModal.forEach(user => {
         html += `
           <label class="user-checkbox">
             <input type="checkbox" value="${user.id}">
@@ -556,7 +599,7 @@
 
     async function createGroupChat() {
       const groupName = document.getElementById('groupName').value.trim();
-      const checkboxes = document.querySelectorAll('#usersList input[type="checkbox"]:checked');
+      const checkboxes = document.querySelectorAll('#usersListModal input[type="checkbox"]:checked');
       
       if (!groupName) {
         alert('Введите название беседы');
@@ -583,44 +626,12 @@
         
         hideCreateGroupModal();
         document.getElementById('groupName').value = '';
-        loadChats();
+        alert('Беседа успешно создана!');
         
       } catch (error) {
         console.error('Ошибка создания беседы:', error);
         alert('Ошибка при создании беседы: ' + error.message);
       }
-    }
-
-    // ---------- Переключение режимов на мобилках ----------
-    function enterChatMode() {
-      isChatMode = true;
-      document.body.classList.add('chat-mode');
-      document.getElementById('mobileMenuBtn').style.display = 'none';
-    }
-
-    function exitChatMode() {
-      isChatMode = false;
-      document.body.classList.remove('chat-mode');
-      document.getElementById('mobileMenuBtn').style.display = 'flex';
-
-      if (unsubscribeMessages) {
-        unsubscribeMessages();
-        unsubscribeMessages = null;
-      }
-      selectedChat = null;
-      currentChatId = null;
-      document.getElementById('chatHeader').innerHTML = '<div class="no-chat-selected">Выберите чат для начала общения</div>';
-      document.getElementById('messagesContainer').innerHTML = '';
-      document.getElementById('messageInputArea').style.display = 'none';
-    }
-
-    function openUserProfile(userId) {
-      window.location.href = `user.html?id=${userId}`;
-    }
-
-    function openChatInfo(chatId) {
-      // TODO: открыть информацию о групповом чате
-      console.log('Open chat info:', chatId);
     }
 
     // ---------- Мобильное меню (бургер) ----------
@@ -635,7 +646,7 @@
       auth.signOut().then(() => window.location.href = 'index.html');
     }
 
-    // ---------- Обработка resize ----------
+    // ---------- Обработка resize и инициализация ----------
     window.addEventListener('load', function() {
       if (window.innerWidth <= 768) {
         document.body.classList.remove('chat-mode');
