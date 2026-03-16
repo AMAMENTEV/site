@@ -847,6 +847,7 @@ async function getUserById(userId) {
     // ---------- Глобальное прослушивание новых сообщений ----------
 // ---------- Глобальное прослушивание новых сообщений ----------
 // ---------- Глобальное прослушивание новых сообщений ----------
+// ---------- Глобальное прослушивание новых сообщений ----------
 function listenForNewMessages() {
   if (!currentUser) return;
   
@@ -864,43 +865,34 @@ function listenForNewMessages() {
       });
     }, error => console.error('Ошибка прослушивания чатов:', error));
   
-  // Слушаем изменения в сообщениях (включая удаление)
-  // Это ключевой момент - слушаем все сообщения во всех чатах пользователя
-  db.collectionGroup('messages')
-    .where('receiverId', '==', currentUser.uid)
-    .onSnapshot(snapshot => {
-      snapshot.docChanges().forEach(change => {
-        if (change.type === 'modified' || change.type === 'added' || change.type === 'removed') {
-          console.log('Messages changed in chat');
-          requestAnimationFrame(() => {
-            loadChats();
-          });
-        }
-      });
-    }, error => console.error('Ошибка прослушивания сообщений:', error));
-  
-  // Также слушаем изменения в сообщениях групповых чатов
-  db.collectionGroup('messages')
-    .where('senderId', '!=', currentUser.uid)
-    .onSnapshot(snapshot => {
-      snapshot.docChanges().forEach(change => {
-        if (change.type === 'modified' || change.type === 'added' || change.type === 'removed') {
-          // Проверяем, является ли пользователь участником этого чата
-          const chatRef = change.doc.ref.parent.parent;
-          if (chatRef) {
-            chatRef.get().then(chatDoc => {
-              const chat = chatDoc.data();
-              if (chat && chat.participants && chat.participants.includes(currentUser.uid)) {
-                console.log('Group message changed');
-                requestAnimationFrame(() => {
-                  loadChats();
-                });
+  // Получаем все чаты пользователя
+  db.collection('chats')
+    .where('participants', 'array-contains', currentUser.uid)
+    .get()
+    .then(snapshot => {
+      snapshot.forEach(doc => {
+        // Для каждого чата слушаем ВСЕ изменения в сообщениях
+        db.collection('chats').doc(doc.id)
+          .collection('messages')
+          .onSnapshot(msgSnapshot => {
+            msgSnapshot.docChanges().forEach(change => {
+              // Срабатывает на добавление, изменение и удаление
+              console.log('Message changed in chat', doc.id, change.type);
+              
+              // Если сообщение не от текущего пользователя и мы в этом чате
+              if (change.doc.data().senderId !== currentUser.uid && currentChatId === doc.id) {
+                // Помечаем как прочитанное
+                change.doc.ref.update({ read: true });
               }
+              
+              // ОБЯЗАТЕЛЬНО обновляем список чатов у всех
+              requestAnimationFrame(() => {
+                loadChats();
+              });
             });
-          }
-        }
+          }, error => console.error('Ошибка прослушивания сообщений:', error));
       });
-    }, error => console.error('Ошибка прослушивания групповых сообщений:', error));
+    });
 }
     // ---------- Создание группового чата ----------
     function showCreateGroupModal() {
