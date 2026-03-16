@@ -68,7 +68,10 @@
     let currentChatId = null;
     let unsubscribeMessages = null;
     let allUsers = [];
-    let isChatMode = false; // true – показываем чат, false – список пользователей
+    let isChatMode = false;
+    
+    // Объект для хранения количества непрочитанных сообщений по каждому пользователю
+    let unreadCounts = {};
 
     // ---------- Проверка авторизации ----------
     auth.onAuthStateChanged(async (user) => {
@@ -108,18 +111,28 @@
           .where('participants', 'array-contains', currentUser.uid)
           .get();
 
-        // 3. Собираем ID пользователей, с которыми есть чаты
+        // 3. Собираем ID пользователей и получаем непрочитанные сообщения
         const chatUserIds = new Set();
-        chatsSnapshot.forEach(doc => {
+        unreadCounts = {};
+        
+        for (const doc of chatsSnapshot.docs) {
           const chat = doc.data();
           const otherUserId = chat.participants.find(id => id !== currentUser.uid);
           if (otherUserId) {
             chatUserIds.add(otherUserId);
+            
+            // Получаем количество непрочитанных сообщений в этом чате
+            const messagesSnapshot = await db.collection('chats').doc(doc.id)
+              .collection('messages')
+              .where('read', '==', false)
+              .where('receiverId', '==', currentUser.uid)
+              .get();
+            
+            unreadCounts[otherUserId] = messagesSnapshot.size;
           }
-        });
+        }
 
         // 4. Формируем список пользователей для отображения
-        // По умолчанию показываем только тех, с кем есть чаты
         allUsers = []; // полный список для поиска
         const chatUsers = []; // только с чатами
 
@@ -130,7 +143,20 @@
           }
         });
 
-        // 5. Отображаем пользователей с чатами
+        // 5. Сортируем пользователей: сначала с непрочитанными, потом по алфавиту
+        chatUsers.sort((a, b) => {
+          const unreadA = unreadCounts[a.id] || 0;
+          const unreadB = unreadCounts[b.id] || 0;
+          
+          // Сначала по количеству непрочитанных (от большего к меньшему)
+          if (unreadB !== unreadA) {
+            return unreadB - unreadA;
+          }
+          // Потом по алфавиту
+          return (a.nickname || '').localeCompare(b.nickname || '');
+        });
+
+        // 6. Отображаем пользователей с чатами
         if (chatUsers.length === 0) {
           usersList.innerHTML = '<div class="no-users">Нет активных чатов. Найдите пользователя через поиск.</div>';
         } else {
@@ -150,7 +176,7 @@
           if (targetUser) {
             setTimeout(() => {
               selectUser(targetUser.id, targetUser.nickname, targetUser.tag);
-            }, 500); // Небольшая задержка для загрузки
+            }, 500);
           }
         }
         
@@ -162,16 +188,18 @@
 
     function displayUsers(users) {
       const usersList = document.getElementById('usersList');
-      users.sort((a, b) => (a.nickname || '').localeCompare(b.nickname || ''));
       usersList.innerHTML = users.map(user => {
         const firstLetter = user.nickname ? user.nickname.charAt(0).toUpperCase() : '?';
         const tag = user.tag || '';
         const nickname = user.nickname || 'Без имени';
+        const unreadCount = unreadCounts[user.id] || 0;
+        const unreadBadge = unreadCount > 0 ? `<span class="unread-badge">${unreadCount}</span>` : '';
+        
         return `
-          <div class="user-item" onclick="selectUser('${user.id}', '${nickname.replace(/'/g, "\\'")}', '${tag.replace(/'/g, "\\'")}')">
+          <div class="user-item ${unreadCount > 0 ? 'has-unread' : ''}" onclick="selectUser('${user.id}', '${nickname.replace(/'/g, "\\'")}', '${tag.replace(/'/g, "\\'")}')">
             <div class="user-avatar-placeholder">${firstLetter}</div>
             <div class="user-info">
-              <div class="user-name">${nickname}</div>
+              <div class="user-name">${nickname} ${unreadBadge}</div>
               <div class="user-tag">${tag}</div>
             </div>
           </div>
@@ -184,7 +212,7 @@
       
       if (!searchText) {
         // Если поиск пустой, показываем только пользователей с чатами
-        loadUsers(); // перезагружаем список
+        loadUsers();
         return;
       }
       
@@ -197,7 +225,29 @@
       if (filtered.length === 0) {
         document.getElementById('usersList').innerHTML = '<div class="no-users">Ничего не найдено</div>';
       } else {
-        displayUsers(filtered);
+        // Для поиска показываем без учета непрочитанных, но сортируем по алфавиту
+        filtered.sort((a, b) => (a.nickname || '').localeCompare(b.nickname || ''));
+        
+        // Временно создаем HTML с учетом непрочитанных
+        const tempHTML = filtered.map(user => {
+          const firstLetter = user.nickname ? user.nickname.charAt(0).toUpperCase() : '?';
+          const tag = user.tag || '';
+          const nickname = user.nickname || 'Без имени';
+          const unreadCount = unreadCounts[user.id] || 0;
+          const unreadBadge = unreadCount > 0 ? `<span class="unread-badge">${unreadCount}</span>` : '';
+          
+          return `
+            <div class="user-item ${unreadCount > 0 ? 'has-unread' : ''}" onclick="selectUser('${user.id}', '${nickname.replace(/'/g, "\\'")}', '${tag.replace(/'/g, "\\'")}')">
+              <div class="user-avatar-placeholder">${firstLetter}</div>
+              <div class="user-info">
+                <div class="user-name">${nickname} ${unreadBadge}</div>
+                <div class="user-tag">${tag}</div>
+              </div>
+            </div>
+          `;
+        }).join('');
+        
+        document.getElementById('usersList').innerHTML = tempHTML;
       }
     }
 
@@ -224,6 +274,40 @@
       }
 
       createOrGetChat();
+      
+      // Сбрасываем счетчик непрочитанных для этого пользователя
+      if (unreadCounts[userId] > 0) {
+        markMessagesAsRead(userId);
+      }
+    }
+
+    // ---------- Отметить сообщения как прочитанные ----------
+    async function markMessagesAsRead(userId) {
+      if (!currentChatId) return;
+      
+      try {
+        const unreadSnapshot = await db.collection('chats').doc(currentChatId)
+          .collection('messages')
+          .where('read', '==', false)
+          .where('receiverId', '==', currentUser.uid)
+          .get();
+        
+        const batch = db.batch();
+        unreadSnapshot.forEach(doc => {
+          batch.update(doc.ref, { read: true });
+        });
+        
+        await batch.commit();
+        
+        // Обновляем счетчик
+        unreadCounts[userId] = 0;
+        
+        // Обновляем отображение списка пользователей
+        loadUsers();
+        
+      } catch (error) {
+        console.error('Ошибка при отметке сообщений как прочитанных:', error);
+      }
     }
 
     function openUserProfile(userId) {
@@ -286,6 +370,7 @@
     function loadMessages() {
       if (!currentChatId) return;
       const messagesContainer = document.getElementById('messagesContainer');
+      
       unsubscribeMessages = db.collection('chats').doc(currentChatId)
         .collection('messages')
         .orderBy('timestamp', 'asc')
@@ -294,11 +379,24 @@
             messagesContainer.innerHTML = '<div class="no-messages">Нет сообщений. Напишите что-нибудь!</div>';
             return;
           }
+          
           let html = '';
           snapshot.forEach(doc => {
             const msg = doc.data();
             const isMyMessage = msg.senderId === currentUser.uid;
             const time = msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+            
+            // Если сообщение не от меня и не прочитано, помечаем как прочитанное
+            if (!isMyMessage && !msg.read) {
+              doc.ref.update({ read: true });
+              
+              // Обновляем счетчик непрочитанных для этого пользователя
+              if (unreadCounts[selectedUser.id] > 0) {
+                unreadCounts[selectedUser.id]--;
+                loadUsers(); // Обновляем список пользователей
+              }
+            }
+            
             html += `
               <div class="message ${isMyMessage ? 'my-message' : 'other-message'}">
                 <div class="message-content">${msg.text}</div>
@@ -306,6 +404,7 @@
               </div>
             `;
           });
+          
           messagesContainer.innerHTML = html;
           messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }, error => console.error('Ошибка загрузки сообщений:', error));
@@ -326,7 +425,8 @@
             text: text,
             senderId: currentUser.uid,
             receiverId: selectedUser.id,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            read: false // Добавляем поле read
           });
         await db.collection('chats').doc(currentChatId).update({
           lastMessage: text,
