@@ -390,61 +390,57 @@
     }
 
     // ---------- Загрузка сообщений ----------
-    function loadMessages() {
-      if (!currentChatId) return;
-      const messagesContainer = document.getElementById('messagesContainer');
+function loadMessages() {
+  if (!currentChatId) return;
+  const messagesContainer = document.getElementById('messagesContainer');
+  
+  unsubscribeMessages = db.collection('chats').doc(currentChatId)
+    .collection('messages')
+    .orderBy('timestamp', 'asc')
+    .onSnapshot(snapshot => {
+      if (snapshot.empty) {
+        messagesContainer.innerHTML = '<div class="no-messages">Нет сообщений. Напишите что-нибудь!</div>';
+        return;
+      }
       
-      unsubscribeMessages = db.collection('chats').doc(currentChatId)
-        .collection('messages')
-        .orderBy('timestamp', 'asc')
-        .onSnapshot(snapshot => {
-          if (snapshot.empty) {
-            messagesContainer.innerHTML = '<div class="no-messages">Нет сообщений. Напишите что-нибудь!</div>';
-            return;
+      // Проверяем, есть ли новые сообщения от собеседника
+      let hasNewMessageFromOther = false;
+      
+      snapshot.docChanges().forEach(change => {
+        if (change.type === 'added') {
+          const msg = change.doc.data();
+          // Если сообщение от собеседника и оно новое (только что добавленное)
+          if (msg.senderId === selectedUser.id) {
+            hasNewMessageFromOther = true;
           }
-          
-          // Проверяем, есть ли новые сообщения от собеседника
-          let hasNewMessageFromOther = false;
-          
-          snapshot.docChanges().forEach(change => {
-            if (change.type === 'added') {
-              const msg = change.doc.data();
-              // Если сообщение от собеседника и оно новое (только что добавленное)
-              if (msg.senderId === selectedUser.id) {
-                hasNewMessageFromOther = true;
-              }
-            }
-          });
-          
-          let html = '';
-          snapshot.forEach(doc => {
-            const msg = doc.data();
-            const isMyMessage = msg.senderId === currentUser.uid;
-            const time = msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-            
-            // Если сообщение не от меня и не прочитано, помечаем как прочитанное
-            if (!isMyMessage && !msg.read) {
-              doc.ref.update({ read: true });
-            }
-            
-            html += `
-              <div class="message ${isMyMessage ? 'my-message' : 'other-message'}">
-                <div class="message-content">${msg.text}</div>
-                <div class="message-time">${time}</div>
-              </div>
-            `;
-          });
-          
-          messagesContainer.innerHTML = html;
-          messagesContainer.scrollTop = messagesContainer.scrollHeight;
-          
-          // Если есть новое сообщение от собеседника, обновляем список пользователей
-          if (hasNewMessageFromOther) {
-            loadUsers();
-          }
-          
-        }, error => console.error('Ошибка загрузки сообщений:', error));
-    }
+        }
+      });
+      
+      let html = '';
+      snapshot.forEach(doc => {
+        const msg = doc.data();
+        const isMyMessage = msg.senderId === currentUser.uid;
+        const time = msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+        
+        html += `
+          <div class="message ${isMyMessage ? 'my-message' : 'other-message'}">
+            <div class="message-content">${msg.text}</div>
+            <div class="message-time">${time}</div>
+          </div>
+        `;
+      });
+      
+      messagesContainer.innerHTML = html;
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      
+      // Если есть новое сообщение от собеседника, обновляем список пользователей
+      if (hasNewMessageFromOther) {
+        console.log('New message from other, updating users list');
+        loadUsers();
+      }
+      
+    }, error => console.error('Ошибка загрузки сообщений:', error));
+}
 
     // ---------- Отправка сообщения ----------
     async function sendMessage() {
