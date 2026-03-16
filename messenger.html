@@ -102,7 +102,8 @@
           <h4>Добавить участников:</h4>
           <input type="text" id="searchUsersToAdd" placeholder="Поиск пользователей..." class="search-input" onkeyup="searchUsersToAdd()">
           <div id="addParticipantsList" class="users-checkbox-list">
-            <!-- Список пользователей для добавления -->
+            <!-- При загрузке пусто, появляется только при поиске -->
+            <div class="no-users">Начните вводить имя для поиска</div>
           </div>
           <button onclick="addSelectedParticipants()" class="modal-save-btn" style="margin-top: 10px; width: 100%;">Добавить выбранных</button>
         </div>
@@ -244,6 +245,46 @@
             chatAvatar = otherUser ? otherUser.tag : '';
           }
           
+          // Получаем последнее не удаленное сообщение
+          let lastMessage = null;
+          let lastMessageTime = chat.lastMessageTime ? chat.lastMessageTime.toDate?.() || new Date(chat.lastMessageTime) : new Date(0);
+          
+          if (chat.lastMessage) {
+            // Проверяем, не удалено ли последнее сообщение
+            const lastMessageDoc = await db.collection('chats').doc(doc.id)
+              .collection('messages')
+              .orderBy('timestamp', 'desc')
+              .limit(1)
+              .get();
+              
+            if (!lastMessageDoc.empty) {
+              const msg = lastMessageDoc.docs[0].data();
+              // Проверяем, не удалено ли сообщение
+              if (!msg.deletedFor || 
+                  (!msg.deletedFor.includes('everyone') && !msg.deletedFor.includes(currentUser.uid))) {
+                lastMessage = msg.text;
+                lastMessageTime = msg.timestamp ? msg.timestamp.toDate?.() || new Date(msg.timestamp) : lastMessageTime;
+              } else {
+                // Если последнее сообщение удалено, ищем предыдущее
+                const messagesSnapshot = await db.collection('chats').doc(doc.id)
+                  .collection('messages')
+                  .orderBy('timestamp', 'desc')
+                  .limit(10)
+                  .get();
+                  
+                for (const msgDoc of messagesSnapshot.docs) {
+                  const msg = msgDoc.data();
+                  if (!msg.deletedFor || 
+                      (!msg.deletedFor.includes('everyone') && !msg.deletedFor.includes(currentUser.uid))) {
+                    lastMessage = msg.text;
+                    lastMessageTime = msg.timestamp ? msg.timestamp.toDate?.() || new Date(msg.timestamp) : lastMessageTime;
+                    break;
+                  }
+                }
+              }
+            }
+          }
+          
           // Получаем количество непрочитанных сообщений
           const messagesSnapshot = await db.collection('chats').doc(doc.id)
             .collection('messages')
@@ -254,6 +295,13 @@
           let unreadCount = 0;
           messagesSnapshot.forEach(msgDoc => {
             const msg = msgDoc.data();
+            // Проверяем, не удалено ли сообщение
+            if (msg.deletedFor) {
+              if (msg.deletedFor.includes('everyone') || msg.deletedFor.includes(currentUser.uid)) {
+                return; // Пропускаем удаленные
+              }
+            }
+            
             if (chat.isGroup) {
               // В групповом чате сообщение непрочитано, если оно не от текущего пользователя
               if (msg.senderId !== currentUser.uid) {
@@ -274,7 +322,8 @@
             ...chat,
             displayName: chatName,
             displayAvatar: chatAvatar,
-            lastMessageTime: chat.lastMessageTime ? chat.lastMessageTime.toDate?.() || new Date(chat.lastMessageTime) : new Date(0)
+            lastMessage: lastMessage,
+            lastMessageTime: lastMessageTime
           });
         }
         
@@ -440,8 +489,7 @@
       const usersList = document.getElementById('usersListModal');
       
       if (!searchText) {
-        // Если поиск пустой, показываем всех
-        displayAllUsersInCreate();
+        usersList.innerHTML = '<div class="no-users">Начните вводить имя для поиска</div>';
         return;
       }
       
@@ -467,20 +515,6 @@
       usersList.innerHTML = html;
     }
 
-    function displayAllUsersInCreate() {
-      const usersList = document.getElementById('usersListModal');
-      let html = '';
-      allUsersForModal.forEach(user => {
-        html += `
-          <label class="user-checkbox">
-            <input type="checkbox" value="${user.id}">
-            <span>${user.nickname} ${user.tag}</span>
-          </label>
-        `;
-      });
-      usersList.innerHTML = html;
-    }
-
     // ---------- Поиск пользователей для добавления в беседу ----------
     function searchUsersToAdd() {
       if (!selectedChat) return;
@@ -488,16 +522,15 @@
       const searchText = document.getElementById('searchUsersToAdd').value.toLowerCase();
       const addList = document.getElementById('addParticipantsList');
       
+      if (!searchText) {
+        addList.innerHTML = '<div class="no-users">Начните вводить имя для поиска</div>';
+        return;
+      }
+      
       // Показываем только тех пользователей, которых еще нет в чате
       const nonParticipants = allUsersForModal.filter(user => 
         !selectedChat.participants.includes(user.id)
       );
-      
-      if (!searchText) {
-        // Если поиск пустой, показываем всех неучастников
-        displayNonParticipants(nonParticipants);
-        return;
-      }
       
       const filtered = nonParticipants.filter(user =>
         (user.nickname && user.nickname.toLowerCase().includes(searchText)) ||
@@ -511,25 +544,6 @@
       
       let html = '';
       filtered.forEach(user => {
-        html += `
-          <label class="user-checkbox">
-            <input type="checkbox" value="${user.id}">
-            <span>${user.nickname} ${user.tag}</span>
-          </label>
-        `;
-      });
-      addList.innerHTML = html;
-    }
-
-    function displayNonParticipants(nonParticipants) {
-      const addList = document.getElementById('addParticipantsList');
-      if (nonParticipants.length === 0) {
-        addList.innerHTML = '<div class="no-users">Все пользователи уже в беседе</div>';
-        return;
-      }
-      
-      let html = '';
-      nonParticipants.forEach(user => {
         html += `
           <label class="user-checkbox">
             <input type="checkbox" value="${user.id}">
@@ -879,15 +893,7 @@
       if (!usersList) return;
       
       document.getElementById('searchUsersInCreate').value = '';
-      
-      if (allUsersForModal.length === 0) {
-        usersList.innerHTML = '<div class="no-users">Загрузка пользователей...</div>';
-        loadAllUsersForModal().then(() => {
-          displayAllUsersInCreate();
-        });
-      } else {
-        displayAllUsersInCreate();
-      }
+      usersList.innerHTML = '<div class="no-users">Начните вводить имя для поиска</div>';
       
       document.getElementById('createGroupModal').style.display = 'flex';
     }
@@ -971,10 +977,9 @@
           leaveBtn.style.display = 'block';
         }
         
-        // Загружаем список пользователей для добавления
+        // Очищаем поле поиска и список добавления
         document.getElementById('searchUsersToAdd').value = '';
-        const nonParticipants = allUsersForModal.filter(user => !chat.participants.includes(user.id));
-        displayNonParticipants(nonParticipants);
+        document.getElementById('addParticipantsList').innerHTML = '<div class="no-users">Начните вводить имя для поиска</div>';
         
         // Показываем кнопку удаления только создателю
         const deleteBtn = document.getElementById('deleteGroupBtn');
@@ -1189,7 +1194,8 @@
         
         hideMessageOptions();
         
-        // Сообщение исчезнет автоматически благодаря onSnapshot
+        // Обновляем список чатов, чтобы убрать удаленное сообщение из последних
+        await loadChats();
         
       } catch (error) {
         console.error('Ошибка удаления сообщения:', error);
@@ -1212,6 +1218,9 @@
           });
         
         hideMessageOptions();
+        
+        // Обновляем список чатов, чтобы убрать удаленное сообщение из последних
+        await loadChats();
         
       } catch (error) {
         console.error('Ошибка удаления сообщения:', error);
