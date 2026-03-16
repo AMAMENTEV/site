@@ -190,28 +190,32 @@ async function loadUsers() {
 
     // ---------- Выбор пользователя для чата ----------
     function selectUser(userId, nickname, tag) {
-      selectedUser = { id: userId, nickname, tag };
+  selectedUser = { id: userId, nickname, tag };
 
-      const chatHeader = document.getElementById('chatHeader');
-      chatHeader.innerHTML = `
-        <div class="selected-user">
-          <button class="mobile-back-btn" onclick="exitChatMode()">←</button>
-          <div class="chat-user-avatar-placeholder">${nickname.charAt(0).toUpperCase()}</div>
-          <div class="chat-user-info">
-            <h3>${nickname}</h3>
-            <p>${tag}</p>
-          </div>
-        </div>
-      `;
+  const chatHeader = document.getElementById('chatHeader');
+  chatHeader.innerHTML = `
+    <div class="selected-user" onclick="openUserProfile('${userId}')">
+      <button class="mobile-back-btn" onclick="event.stopPropagation(); exitChatMode()">←</button>
+      <div class="chat-user-avatar-placeholder">${nickname.charAt(0).toUpperCase()}</div>
+      <div class="chat-user-info">
+        <h3>${nickname}</h3>
+        <p>${tag}</p>
+      </div>
+    </div>
+  `;
 
-      document.getElementById('messageInputArea').style.display = 'flex';
+  document.getElementById('messageInputArea').style.display = 'flex';
 
-      if (window.innerWidth <= 768) {
-        enterChatMode();
-      }
+  if (window.innerWidth <= 768) {
+    enterChatMode();
+  }
 
-      createOrGetChat();
-    }
+  createOrGetChat();
+}
+
+function openUserProfile(userId) {
+  window.location.href = `user.html?id=${userId}`;
+}
 
     // ---------- Переключение режимов на мобилках ----------
     function enterChatMode() {
