@@ -89,7 +89,7 @@
     // ---------- Глобальные переменные ----------
     let currentUser = null;
     let currentUserData = null;
-    let selectedChat = null; // { id, name, isGroup, participants }
+    let selectedChat = null;
     let currentChatId = null;
     let unsubscribeMessages = null;
     let allChats = [];
@@ -148,10 +148,13 @@
           .where('participants', 'array-contains', currentUser.uid)
           .get();
 
-        allChats = [];
-        const newUnreadCounts = {};
+        // Используем Map для уникальности чатов
+        const chatsMap = new Map();
         
         for (const doc of chatsSnapshot.docs) {
+          // Если чат уже есть в Map, пропускаем
+          if (chatsMap.has(doc.id)) continue;
+          
           const chat = doc.data();
           
           // Определяем название и аватар чата
@@ -185,9 +188,9 @@
             }
           });
           
-          newUnreadCounts[doc.id] = unreadCount;
+          unreadCounts[doc.id] = unreadCount;
           
-          allChats.push({
+          chatsMap.set(doc.id, {
             id: doc.id,
             ...chat,
             displayName: chatName,
@@ -196,7 +199,8 @@
           });
         }
         
-        unreadCounts = newUnreadCounts;
+        // Преобразуем Map в массив
+        allChats = Array.from(chatsMap.values());
 
         // Сортируем чаты: сначала с непрочитанными, потом по времени последнего сообщения
         allChats.sort((a, b) => {
