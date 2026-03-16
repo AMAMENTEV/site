@@ -209,6 +209,57 @@
       }
     }
 
+auth.onAuthStateChanged(async (user) => {
+  console.log('Auth state changed:', user ? user.email : 'no user');
+  if (!user || !user.emailVerified) {
+    window.location.href = 'index.html';
+    return;
+  }
+  currentUser = user;
+  try {
+    const userDoc = await db.collection('users').doc(user.uid).get();
+    if (userDoc.exists) {
+      currentUserData = userDoc.data();
+    }
+  } catch (error) {
+    console.error('Ошибка загрузки пользователя:', error);
+  }
+  loadUsers();
+  
+  // Запускаем глобальное прослушивание новых сообщений
+  listenForNewMessages();
+});
+
+// ---------- Глобальное прослушивание новых сообщений ----------
+function listenForNewMessages() {
+  // Слушаем все чаты, где текущий пользователь - получатель
+  db.collection('chats')
+    .where('participants', 'array-contains', currentUser.uid)
+    .onSnapshot(snapshot => {
+      snapshot.docChanges().forEach(change => {
+        if (change.type === 'modified' || change.type === 'added') {
+          // При любом изменении в чатах обновляем список пользователей
+          console.log('Chat updated, refreshing users list');
+          loadUsers();
+        }
+      });
+    }, error => console.error('Ошибка прослушивания чатов:', error));
+  
+  // Также слушаем все непрочитанные сообщения
+  db.collectionGroup('messages')
+    .where('receiverId', '==', currentUser.uid)
+    .where('read', '==', false)
+    .onSnapshot(snapshot => {
+      snapshot.docChanges().forEach(change => {
+        if (change.type === 'added') {
+          // Если появилось новое непрочитанное сообщение
+          console.log('New unread message received');
+          loadUsers();
+        }
+      });
+    }, error => console.error('Ошибка прослушивания сообщений:', error));
+}
+
     function displayUsers(users) {
       const usersList = document.getElementById('usersList');
       usersList.innerHTML = users.map(user => {
