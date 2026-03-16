@@ -246,8 +246,34 @@
           }
           
           // Получаем последнее не удаленное сообщение
-          let lastMessage = null;
-          let lastMessageTime = chat.lastMessageTime ? chat.lastMessageTime.toDate?.() || new Date(chat.lastMessageTime) : new Date(0);
+let lastMessage = null;
+let lastMessageTime = chat.lastMessageTime ? chat.lastMessageTime.toDate?.() || new Date(chat.lastMessageTime) : new Date(0);
+
+// Ищем последнее не удаленное сообщение
+const messagesQuery = await db.collection('chats').doc(doc.id)
+  .collection('messages')
+  .orderBy('timestamp', 'desc')
+  .limit(20)
+  .get();
+
+for (const msgDoc of messagesQuery.docs) {
+  const msg = msgDoc.data();
+  
+  // Проверяем, не удалено ли сообщение для всех
+  if (msg.deletedFor && msg.deletedFor.includes('everyone')) {
+    continue; // Пропускаем удаленные для всех
+  }
+  
+  // Проверяем, не удалено ли сообщение для текущего пользователя
+  if (msg.deletedFor && msg.deletedFor.includes(currentUser.uid)) {
+    continue; // Пропускаем удаленные для текущего
+  }
+  
+  // Нашли последнее не удаленное сообщение
+  lastMessage = msg.text;
+  lastMessageTime = msg.timestamp ? msg.timestamp.toDate?.() || new Date(msg.timestamp) : lastMessageTime;
+  break;
+}
           
           if (chat.lastMessage) {
             // Проверяем, не удалено ли последнее сообщение
@@ -285,35 +311,41 @@
             }
           }
           
-          // Получаем количество непрочитанных сообщений
-          const messagesSnapshot = await db.collection('chats').doc(doc.id)
-            .collection('messages')
-            .where('read', '==', false)
-            .get();
-          
-          // Для группового чата считаем непрочитанные, только если сообщение не от текущего пользователя
-          let unreadCount = 0;
-          messagesSnapshot.forEach(msgDoc => {
-            const msg = msgDoc.data();
-            // Проверяем, не удалено ли сообщение
-            if (msg.deletedFor) {
-              if (msg.deletedFor.includes('everyone') || msg.deletedFor.includes(currentUser.uid)) {
-                return; // Пропускаем удаленные
-              }
-            }
-            
-            if (chat.isGroup) {
-              // В групповом чате сообщение непрочитано, если оно не от текущего пользователя
-              if (msg.senderId !== currentUser.uid) {
-                unreadCount++;
-              }
-            } else {
-              // В личном чате - только те, которые адресованы текущему
-              if (msg.receiverId === currentUser.uid) {
-                unreadCount++;
-              }
-            }
-          });
+          // В функции loadChats(), в месте где считаются непрочитанные сообщения:
+
+// Получаем количество непрочитанных сообщений
+const messagesSnapshot = await db.collection('chats').doc(doc.id)
+  .collection('messages')
+  .where('read', '==', false)
+  .get();
+
+// Для группового чата считаем непрочитанные, только если сообщение не от текущего пользователя
+let unreadCount = 0;
+messagesSnapshot.forEach(msgDoc => {
+  const msg = msgDoc.data();
+  
+  // Проверяем, не удалено ли сообщение для всех
+  if (msg.deletedFor && msg.deletedFor.includes('everyone')) {
+    return; // Пропускаем удаленные для всех
+  }
+  
+  // Проверяем, не удалено ли сообщение для текущего пользователя
+  if (msg.deletedFor && msg.deletedFor.includes(currentUser.uid)) {
+    return; // Пропускаем удаленные для текущего
+  }
+  
+  if (chat.isGroup) {
+    // В групповом чате сообщение непрочитано, если оно не от текущего пользователя
+    if (msg.senderId !== currentUser.uid) {
+      unreadCount++;
+    }
+  } else {
+    // В личном чате - только те, которые адресованы текущему
+    if (msg.receiverId === currentUser.uid) {
+      unreadCount++;
+    }
+  }
+});
           
           newUnreadCounts[doc.id] = unreadCount;
           
@@ -1152,81 +1184,93 @@
     }
 
     // ---------- Удаление сообщений ----------
-    function showMessageOptions(messageId, event) {
-      if (event) {
-        event.stopPropagation();
-      }
-      selectedMessageId = messageId;
-      
-      // Получаем данные сообщения
-      const msgElement = document.getElementById(`msg-${messageId}`);
-      if (!msgElement) return;
-      
-      const isMyMessage = msgElement.classList.contains('my-message');
-      
-      // Показываем кнопку "Удалить у всех" только для своих сообщений
-      const deleteForEveryoneBtn = document.getElementById('deleteForEveryoneBtn');
-      if (isMyMessage) {
-        deleteForEveryoneBtn.style.display = 'block';
-      } else {
-        deleteForEveryoneBtn.style.display = 'none';
-      }
-      
-      document.getElementById('messageOptionsModal').style.display = 'flex';
-    }
+function showMessageOptions(messageId, event) {
+  if (event) {
+    event.stopPropagation();
+  }
+  selectedMessageId = messageId;
+  
+  // Получаем данные сообщения
+  const msgElement = document.getElementById(`msg-${messageId}`);
+  if (!msgElement) return;
+  
+  const isMyMessage = msgElement.classList.contains('my-message');
+  
+  // Показываем кнопку "Удалить у всех" только для своих сообщений
+  const deleteForEveryoneBtn = document.getElementById('deleteForEveryoneBtn');
+  if (isMyMessage) {
+    deleteForEveryoneBtn.style.display = 'block';
+  } else {
+    deleteForEveryoneBtn.style.display = 'none';
+  }
+  
+  document.getElementById('messageOptionsModal').style.display = 'flex';
+}
 
-    function hideMessageOptions() {
-      document.getElementById('messageOptionsModal').style.display = 'none';
-      selectedMessageId = null;
-    }
+function hideMessageOptions() {
+  document.getElementById('messageOptionsModal').style.display = 'none';
+  selectedMessageId = null;
+}
 
-    async function deleteMessageForMe() {
-      if (!selectedMessageId || !currentChatId) return;
-      
-      try {
-        // Добавляем ID текущего пользователя в список deletedFor
-        await db.collection('chats').doc(currentChatId)
-          .collection('messages')
-          .doc(selectedMessageId)
-          .update({
-            deletedFor: firebase.firestore.FieldValue.arrayUnion(currentUser.uid)
-          });
-        
-        hideMessageOptions();
-        
-        // Обновляем список чатов, чтобы убрать удаленное сообщение из последних
-        await loadChats();
-        
-      } catch (error) {
-        console.error('Ошибка удаления сообщения:', error);
-        alert('Ошибка при удалении сообщения');
-      }
-    }
+async function deleteMessageForMe() {
+  if (!selectedMessageId || !currentChatId) return;
+  
+  try {
+    // Добавляем ID текущего пользователя в список deletedFor
+    await db.collection('chats').doc(currentChatId)
+      .collection('messages')
+      .doc(selectedMessageId)
+      .update({
+        deletedFor: firebase.firestore.FieldValue.arrayUnion(currentUser.uid)
+      });
+    
+    hideMessageOptions();
+    
+    // Обновляем список чатов, чтобы убрать удаленное сообщение из последних
+    await loadChats();
+    
+  } catch (error) {
+    console.error('Ошибка удаления сообщения:', error);
+    alert('Ошибка при удалении сообщения');
+  }
+}
 
-    async function deleteMessageForEveryone() {
-      if (!selectedMessageId || !currentChatId) return;
-      
-      if (!confirm('Удалить это сообщение у всех участников?')) return;
-      
-      try {
-        // Помечаем сообщение как удаленное для всех
-        await db.collection('chats').doc(currentChatId)
-          .collection('messages')
-          .doc(selectedMessageId)
-          .update({
-            deletedFor: ['everyone']
-          });
-        
-        hideMessageOptions();
-        
-        // Обновляем список чатов, чтобы убрать удаленное сообщение из последних
-        await loadChats();
-        
-      } catch (error) {
-        console.error('Ошибка удаления сообщения:', error);
-        alert('Ошибка при удалении сообщения');
-      }
-    }
+async function deleteMessageForEveryone() {
+  if (!selectedMessageId || !currentChatId) return;
+  
+  if (!confirm('Удалить это сообщение у всех участников?')) return;
+  
+  try {
+    // Получаем информацию о сообщении перед удалением
+    const messageDoc = await db.collection('chats').doc(currentChatId)
+      .collection('messages')
+      .doc(selectedMessageId)
+      .get();
+    
+    const messageData = messageDoc.data();
+    
+    // Помечаем сообщение как удаленное для всех
+    await db.collection('chats').doc(currentChatId)
+      .collection('messages')
+      .doc(selectedMessageId)
+      .update({
+        deletedFor: ['everyone']
+      });
+    
+    // Обновляем счетчики непрочитанных для всех участников
+    // Это произойдет автоматически через onSnapshot в loadChats,
+    // но нужно убедиться, что сообщение больше не считается непрочитанным
+    
+    hideMessageOptions();
+    
+    // Обновляем список чатов, чтобы убрать удаленное сообщение из последних
+    await loadChats();
+    
+  } catch (error) {
+    console.error('Ошибка удаления сообщения:', error);
+    alert('Ошибка при удалении сообщения');
+  }
+}
 
     // ---------- Переключение режимов на мобилках ----------
     function enterChatMode() {
