@@ -511,94 +511,98 @@
     }
 
     // ---------- Загрузка сообщений ----------
-    function loadMessages() {
-      if (!currentChatId) return;
-      const messagesContainer = document.getElementById('messagesContainer');
-      
-      if (unsubscribeMessages) {
-        unsubscribeMessages();
+function loadMessages() {
+  if (!currentChatId) return;
+  const messagesContainer = document.getElementById('messagesContainer');
+  
+  if (unsubscribeMessages) {
+    unsubscribeMessages();
+  }
+  
+  unsubscribeMessages = db.collection('chats').doc(currentChatId)
+    .collection('messages')
+    .orderBy('timestamp', 'asc')
+    .onSnapshot(async snapshot => {
+      if (snapshot.empty) {
+        messagesContainer.innerHTML = '<div class="no-messages">Нет сообщений. Напишите что-нибудь!</div>';
+        return;
       }
       
-      unsubscribeMessages = db.collection('chats').doc(currentChatId)
-        .collection('messages')
-        .orderBy('timestamp', 'asc')
-        .onSnapshot(async snapshot => {
-          if (snapshot.empty) {
-            messagesContainer.innerHTML = '<div class="no-messages">Нет сообщений. Напишите что-нибудь!</div>';
-            return;
-          }
-          
-          let hasNewMessageFromOther = false;
-          
-          snapshot.docChanges().forEach(change => {
-            if (change.type === 'added') {
-              const msg = change.doc.data();
-              if (msg.senderId !== currentUser.uid) {
-                hasNewMessageFromOther = true;
-              }
-            }
-          });
-          
-          let html = '';
-          
-          // Для группового чата собираем информацию об отправителях
-          const senderIds = new Set();
-          if (selectedChat && selectedChat.isGroup) {
-            snapshot.forEach(doc => {
-              const msg = doc.data();
-              if (msg.senderId !== currentUser.uid) {
-                senderIds.add(msg.senderId);
-              }
-            });
-          }
-          
-          const userCache = {};
-          for (const id of senderIds) {
-            const userData = await getUserById(id);
-            if (userData) {
-              userCache[id] = userData;
-            }
-          }
-          
-          snapshot.forEach(doc => {
-            const msg = doc.data();
-            const isMyMessage = msg.senderId === currentUser.uid;
-            const time = msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+      let hasNewMessageFromOther = false;
+      const batch = db.batch(); // Создаем batch для отметки прочитанных
+      
+      snapshot.docChanges().forEach(change => {
+        if (change.type === 'added') {
+          const msg = change.doc.data();
+          // Если сообщение от другого пользователя
+          if (msg.senderId !== currentUser.uid) {
+            hasNewMessageFromOther = true;
             
-            // Для группового чата показываем имя отправителя
-            let senderInfo = '';
-            if (selectedChat && selectedChat.isGroup && !isMyMessage) {
-              const sender = userCache[msg.senderId];
-              if (sender) {
-                senderInfo = `<div class="message-sender">${sender.nickname} ${sender.tag}</div>`;
-              }
-            }
-            
-            // Если сообщение от другого и мы в этом чате, помечаем как прочитанное сразу
-            if (!isMyMessage && selectedChat && selectedChat.id === currentChatId) {
-              // Не помечаем здесь, это сделает markMessagesAsRead
-            }
-            
-            html += `
-              <div class="message ${isMyMessage ? 'my-message' : 'other-message'}">
-                ${senderInfo}
-                <div class="message-content">${msg.text}</div>
-                <div class="message-time">${time}</div>
-              </div>
-            `;
-          });
-          
-          messagesContainer.innerHTML = html;
-          messagesContainer.scrollTop = messagesContainer.scrollHeight;
-          
-          if (hasNewMessageFromOther) {
-            // Обновляем список чатов для обновления счетчиков
-            loadChats();
+            // СРАЗУ помечаем как прочитанное, потому что мы в этом чате
+            batch.update(change.doc.ref, { read: true });
           }
-          
-        }, error => console.error('Ошибка загрузки сообщений:', error));
-    }
-
+        }
+      });
+      
+      // Применяем отметки прочитанных
+      if (hasNewMessageFromOther) {
+        await batch.commit();
+      }
+      
+      let html = '';
+      
+      // Для группового чата собираем информацию об отправителях
+      const senderIds = new Set();
+      if (selectedChat && selectedChat.isGroup) {
+        snapshot.forEach(doc => {
+          const msg = doc.data();
+          if (msg.senderId !== currentUser.uid) {
+            senderIds.add(msg.senderId);
+          }
+        });
+      }
+      
+      const userCache = {};
+      for (const id of senderIds) {
+        const userData = await getUserById(id);
+        if (userData) {
+          userCache[id] = userData;
+        }
+      }
+      
+      snapshot.forEach(doc => {
+        const msg = doc.data();
+        const isMyMessage = msg.senderId === currentUser.uid;
+        const time = msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+        
+        // Для группового чата показываем имя отправителя
+        let senderInfo = '';
+        if (selectedChat && selectedChat.isGroup && !isMyMessage) {
+          const sender = userCache[msg.senderId];
+          if (sender) {
+            senderInfo = `<div class="message-sender">${sender.nickname} ${sender.tag}</div>`;
+          }
+        }
+        
+        html += `
+          <div class="message ${isMyMessage ? 'my-message' : 'other-message'}">
+            ${senderInfo}
+            <div class="message-content">${msg.text}</div>
+            <div class="message-time">${time}</div>
+          </div>
+        `;
+      });
+      
+      messagesContainer.innerHTML = html;
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      
+      if (hasNewMessageFromOther) {
+        // Обновляем список чатов для обновления счетчиков
+        loadChats();
+      }
+      
+    }, error => console.error('Ошибка загрузки сообщений:', error));
+}
     // ---------- Отправка сообщения ----------
     async function sendMessage() {
       const input = document.getElementById('messageInput');
