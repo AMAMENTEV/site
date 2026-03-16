@@ -12,7 +12,7 @@
 <body>
   <div class="container">
     <div class="header">
-      <a href="messenger.html" class="back-btn">← Мессенджер</a>
+      <a href="messenger.html" class="back-btn"><</a>
     </div>
     
     <div id="userProfileContent" class="profile-page">
@@ -22,17 +22,17 @@
 
   <script src="firebase-config.js"></script>
   <script>
+    // Получаем ID пользователя из URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const userId = urlParams.get('id');
+    
+    if (!userId) {
+      window.location.href = 'messenger.html';
+    }
+
     auth.onAuthStateChanged(async (user) => {
       if (!user || !user.emailVerified) {
         window.location.href = 'index.html';
-        return;
-      }
-      
-      const urlParams = new URLSearchParams(window.location.search);
-      const userId = urlParams.get('id');
-      
-      if (!userId) {
-        window.location.href = 'messenger.html';
         return;
       }
       
