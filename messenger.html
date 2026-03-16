@@ -180,28 +180,32 @@
         });
 
         // 6. Отображаем пользователей с чатами
-        if (chatUsers.length === 0) {
-          usersList.innerHTML = '<div class="no-users">Нет активных чатов. Найдите пользователя через поиск.</div>';
-        } else {
-          displayUsers(chatUsers);
-        }
+if (chatUsers.length === 0) {
+  usersList.innerHTML = '<div class="no-users">Нет активных чатов. Найдите пользователя через поиск.</div>';
+} else {
+  displayUsers(chatUsers);
+}
 
-        // Сохраняем полный список для поиска
-        window.allUsers = allUsers;
+// Сохраняем полный список для поиска
+window.allUsers = allUsers;
 
-        // Проверяем, есть ли параметр userId в URL
-        const urlParams = new URLSearchParams(window.location.search);
-        const targetUserId = urlParams.get('userId');
+// Проверяем, есть ли параметр userId в URL
+const urlParams = new URLSearchParams(window.location.search);
+const targetUserId = urlParams.get('userId');
 
-        if (targetUserId) {
-          // Ищем пользователя в allUsers
-          const targetUser = allUsers.find(u => u.id === targetUserId);
-          if (targetUser) {
-            setTimeout(() => {
-              selectUser(targetUser.id, targetUser.nickname, targetUser.tag);
-            }, 500);
-          }
-        }
+if (targetUserId) {
+  // Ищем пользователя в allUsers
+  const targetUser = allUsers.find(u => u.id === targetUserId);
+  if (targetUser) {
+    setTimeout(() => {
+      selectUser(targetUser.id, targetUser.nickname, targetUser.tag);
+      
+      // Очищаем URL от параметра userId, чтобы не открывалось снова при обновлении
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+    }, 500);
+  }
+}
         
       } catch (error) {
         console.error('Ошибка загрузки:', error);

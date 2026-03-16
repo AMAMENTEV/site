@@ -1,6 +1,14 @@
 /* ========== ОСНОВНЫЕ НАСТРОЙКИ ========== */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
+/* Используем динамическую высоту для мобильных */
+@supports (height: 100dvh) {
+  .messenger-container,
+  .chat-area {
+    height: 100dvh;
+  }
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -711,11 +719,10 @@ body {
   }
 
   body.chat-mode .chat-area {
-    display: flex !important;
+    height: 100dvh; /* Используем динамическую высоту */
+    padding-bottom: 0;
+    display: flex;
     flex-direction: column;
-    height: 100vh;
-    overflow: hidden;
-    padding-bottom: env(safe-area-inset-bottom, 0);
   }
 
   .chat-header {
@@ -733,7 +740,12 @@ body {
   .message-input-area {
     flex-shrink: 0;
     padding: 12px 16px;
-    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0));
+    padding-bottom: max(12px, env(safe-area-inset-bottom, 12px));
+    background: white;
+    border-top: 1px solid #eef2f6;
+    width: 100%;
+    position: relative;
+    bottom: 0;
   }
 
   /* Синяя кнопка-бургер */
@@ -832,47 +844,53 @@ body {
 
 /* ========== МОБИЛЬНАЯ ВЕРСИЯ ДЛЯ ПРОФИЛЯ ========== */
 @media (max-width: 768px) {
-  /* Сбрасываем стили для body на страницах профиля */
+  /* Сбрасываем все ограничения для страниц профиля */
   body:has(.profile-container) {
     overflow-y: auto !important;
     height: auto !important;
     min-height: 100vh !important;
+    position: static !important;
+  }
+  
+  html:has(.profile-container) {
+    overflow-y: auto !important;
+    height: auto !important;
   }
   
   .profile-container {
     height: auto !important;
     min-height: 100vh;
-    margin: 0;
-    padding: 0;
+    margin: 0 !important;
+    padding: 0 !important;
     overflow: visible !important;
-    display: block;
+    display: block !important;
+    max-width: 100% !important;
   }
   
   .profile-header {
     padding: 12px 16px;
-    margin-bottom: 0;
     position: sticky;
     top: 0;
     background: white;
     z-index: 10;
     box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-    flex-shrink: 0;
+    width: 100%;
   }
   
   .profile-two-columns {
     display: block !important;
-    gap: 0;
+    gap: 0 !important;
     overflow: visible !important;
     height: auto !important;
-    padding: 16px 16px 30px 16px;
-    flex: none;
+    padding: 16px 16px 30px 16px !important;
+    flex: none !important;
   }
   
   .profile-left {
     width: 100% !important;
-    padding-right: 0;
+    padding-right: 0 !important;
     overflow: visible !important;
-    margin-bottom: 24px;
+    margin-bottom: 24px !important;
     height: auto !important;
     max-height: none !important;
   }
@@ -880,6 +898,7 @@ body {
   .profile-card {
     padding: 20px 16px;
     border-radius: 20px;
+    width: 100%;
   }
   
   .profile-avatar-placeholder {
@@ -897,10 +916,12 @@ body {
     padding: 16px 12px;
     margin: 16px 0 0 0;
     border-radius: 16px;
+    width: 100%;
   }
   
   .info-row {
     padding: 10px 0;
+    width: 100%;
   }
   
   .info-row label {
@@ -910,6 +931,7 @@ body {
   
   .info-row span {
     font-size: 0.95rem;
+    flex: 1;
   }
   
   .edit-btn {
@@ -923,7 +945,7 @@ body {
     overflow: visible !important;
     height: auto !important;
     display: block !important;
-    margin-top: 0;
+    margin-top: 0 !important;
     max-height: none !important;
   }
   
@@ -933,7 +955,7 @@ body {
     align-items: center;
     margin-bottom: 16px;
     padding: 0;
-    position: static;
+    width: 100%;
   }
   
   .posts-header h2 {
@@ -951,13 +973,14 @@ body {
   
   .posts-container {
     overflow: visible !important;
-    padding-right: 0;
+    padding-right: 0 !important;
     gap: 12px;
     padding-bottom: 20px;
     max-height: none !important;
     height: auto !important;
     display: flex !important;
     flex-direction: column;
+    width: 100%;
   }
   
   .post-card {
@@ -965,11 +988,13 @@ body {
     margin-bottom: 0;
     border-radius: 14px;
     display: block !important;
+    width: 100%;
   }
   
   .post-header {
     margin-bottom: 8px;
     padding-bottom: 6px;
+    width: 100%;
   }
   
   .post-date {
@@ -979,6 +1004,8 @@ body {
   .post-content {
     font-size: 0.9rem;
     line-height: 1.5;
+    width: 100%;
+    word-wrap: break-word;
   }
   
   .delete-post-btn {
@@ -1016,6 +1043,7 @@ body {
     padding: 12px;
     font-size: 0.95rem;
     border-radius: 10px;
+    width: 100%;
   }
   
   .modal-footer {
@@ -1034,15 +1062,36 @@ body {
   /* Сообщения об ошибках/успехе */
   .message {
     margin-top: 12px;
+    width: 100%;
   }
   
   .error, .success, .warning, .info {
     padding: 12px 16px;
     font-size: 0.9rem;
     border-radius: 10px;
+    width: 100%;
+  }
+  
+  /* Кнопки в шапке */
+  .back-btn, .logout-small-header {
+    min-height: 44px;
+    min-width: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .back-btn {
+    width: 44px;
+    height: 44px;
+    font-size: 1.5rem;
+  }
+  
+  .logout-small-header {
+    padding: 6px 14px;
+    font-size: 0.85rem;
   }
 }
-
 /* ========== ДЕСКТОПНАЯ ВЕРСИЯ ========== */
 @media (min-width: 769px) {
   .mobile-menu-btn,
