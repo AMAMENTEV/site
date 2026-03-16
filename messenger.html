@@ -1145,7 +1145,7 @@ async function loadChats() {
       }
     }
 
-    // ---------- Удаление сообщений ----------
+// ---------- Удаление сообщений ----------
 function showMessageOptions(messageId, event) {
   if (event) {
     event.stopPropagation();
@@ -1188,8 +1188,10 @@ async function deleteMessageForMe() {
     
     hideMessageOptions();
     
-    // Обновляем список чатов, чтобы убрать удаленное сообщение из последних
-    await loadChats();
+    // Ждем немного и обновляем список чатов
+    setTimeout(async () => {
+      await loadChats();
+    }, 500);
     
   } catch (error) {
     console.error('Ошибка удаления сообщения:', error);
@@ -1203,14 +1205,6 @@ async function deleteMessageForEveryone() {
   if (!confirm('Удалить это сообщение у всех участников?')) return;
   
   try {
-    // Получаем информацию о сообщении перед удалением
-    const messageDoc = await db.collection('chats').doc(currentChatId)
-      .collection('messages')
-      .doc(selectedMessageId)
-      .get();
-    
-    const messageData = messageDoc.data();
-    
     // Помечаем сообщение как удаленное для всех
     await db.collection('chats').doc(currentChatId)
       .collection('messages')
@@ -1219,14 +1213,12 @@ async function deleteMessageForEveryone() {
         deletedFor: ['everyone']
       });
     
-    // Обновляем счетчики непрочитанных для всех участников
-    // Это произойдет автоматически через onSnapshot в loadChats,
-    // но нужно убедиться, что сообщение больше не считается непрочитанным
-    
     hideMessageOptions();
     
-    // Обновляем список чатов, чтобы убрать удаленное сообщение из последних
-    await loadChats();
+    // Ждем немного и обновляем список чатов
+    setTimeout(async () => {
+      await loadChats();
+    }, 500);
     
   } catch (error) {
     console.error('Ошибка удаления сообщения:', error);
