@@ -1924,3 +1924,136 @@ body {
     display: flex !important;
   }
 }
+
+/* ========== СТИЛИ ДЛЯ ПОИСКА ========== */
+.search-section {
+  padding: 10px 16px;
+  background: #f8fafc;
+  border-radius: 8px;
+  margin: 8px 0;
+}
+
+.search-section h4 {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ========== СТИЛИ ДЛЯ УДАЛЕНИЯ СООБЩЕНИЙ ========== */
+.message {
+  position: relative;
+}
+
+.message-delete-btn {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: white;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+  padding: 0;
+  z-index: 5;
+}
+
+.message:hover .message-delete-btn {
+  opacity: 1;
+}
+
+.message-delete-btn:hover {
+  background: #fee2e2;
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+/* Модальное окно для действий с сообщением */
+.modal-content.small {
+  max-width: 350px;
+}
+
+.modal-option-btn {
+  width: 100%;
+  padding: 14px;
+  margin: 8px 0;
+  background: #f8fafc;
+  color: #1e293b;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.modal-option-btn:hover {
+  background: #f1f5f9;
+}
+
+.modal-option-btn.delete {
+  background: #fee2e2;
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+.modal-option-btn.delete:hover {
+  background: #fecaca;
+}
+
+/* Стили для системных сообщений */
+.message.system {
+  align-self: center;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 0.85rem;
+  padding: 6px 12px;
+  border-radius: 20px;
+  max-width: 90%;
+  border: none;
+}
+
+.message.system .message-time {
+  display: none;
+}
+
+/* ========== СТИЛИ ДЛЯ ДОБАВЛЕНИЯ УЧАСТНИКОВ ========== */
+.group-info-section {
+  margin-bottom: 24px;
+  padding: 16px;
+  background: #f8fafc;
+  border-radius: 12px;
+}
+
+.group-info-section h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1a1a1a;
+  margin-bottom: 12px;
+}
+
+.participants-list {
+  list-style: none;
+  padding: 0;
+}
+
+.participants-list li {
+  padding: 8px 0;
+  border-bottom: 1px solid #eef2f6;
+  font-size: 0.95rem;
+  color: #334155;
+}
+
+.participants-list li:last-child {
+  border-bottom: none;
+}
