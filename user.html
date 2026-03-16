@@ -108,11 +108,13 @@
     async function loadPosts(targetUserId) {
       const postsContainer = document.getElementById('postsContainer');
       
+      // Отписываемся от предыдущего слушателя
       if (unsubscribePosts) {
         unsubscribePosts();
       }
       
       try {
+        // Слушаем изменения в постах в реальном времени
         unsubscribePosts = db.collection('posts')
           .where('userId', '==', targetUserId)
           .orderBy('createdAt', 'desc')

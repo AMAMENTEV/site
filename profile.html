@@ -202,12 +202,13 @@
     async function loadPosts() {
       const postsContainer = document.getElementById('postsContainer');
       
+      // Отписываемся от предыдущего слушателя
       if (unsubscribePosts) {
         unsubscribePosts();
       }
       
       try {
-        // Слушаем изменения в постах
+        // Слушаем изменения в постах в реальном времени
         unsubscribePosts = db.collection('posts')
           .where('userId', '==', currentUser.uid)
           .orderBy('createdAt', 'desc')
@@ -272,6 +273,7 @@
         });
         
         hideCreatePostModal();
+        // Слушатель сам обновит список, ничего делать не нужно
         
       } catch (error) {
         console.error('Ошибка создания поста:', error);
@@ -284,6 +286,7 @@
       
       try {
         await db.collection('posts').doc(postId).delete();
+        // Слушатель сам обновит список
       } catch (error) {
         console.error('Ошибка удаления поста:', error);
         alert('Ошибка при удалении поста');
