@@ -906,3 +906,15 @@ body {
   color: #0f172a;
   margin-bottom: 4px;
 }
+
+/* Стиль для ошибки интернета */
+.error.internet {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeeba;
+}
+
+.error.internet::before {
+  content: "⚠️";
+  margin-right: 8px;
+}
