@@ -57,7 +57,7 @@
   <div class="sidebar-overlay" id="mobileMenuOverlay" onclick="toggleMobileMenu()"></div>
   <div class="mobile-popup-menu" id="mobilePopupMenu">
     <a href="profile.html" class="popup-item">Мой профиль</a>
-    <button onclick="showCreateGroupModal()" class="popup-item">+ Беседа</button>
+    <button onclick="showCreateGroupModal(); toggleMobileMenu()" class="popup-item">+ Беседа</button>
     <button onclick="logout()" class="popup-item logout">Выйти</button>
   </div>
 
@@ -80,6 +80,24 @@
       <div class="modal-footer">
         <button onclick="hideCreateGroupModal()" class="modal-cancel-btn">Отмена</button>
         <button onclick="createGroupChat()" class="modal-save-btn">Создать</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модальное окно для информации о беседе -->
+  <div id="groupInfoModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="groupInfoName">Информация о беседе</h3>
+        <button onclick="hideGroupInfoModal()" class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="groupParticipants"></div>
+        <div id="groupCreatorInfo"></div>
+      </div>
+      <div class="modal-footer">
+        <button onclick="hideGroupInfoModal()" class="modal-cancel-btn">Закрыть</button>
+        <button onclick="deleteCurrentGroup()" id="deleteGroupBtn" class="modal-delete-btn" style="display: none;">Удалить беседу</button>
       </div>
     </div>
   </div>
@@ -150,6 +168,7 @@
 
         // Используем Map для уникальности чатов
         const chatsMap = new Map();
+        const newUnreadCounts = {};
         
         for (const doc of chatsSnapshot.docs) {
           // Если чат уже есть в Map, пропускаем
@@ -188,7 +207,7 @@
             }
           });
           
-          unreadCounts[doc.id] = unreadCount;
+          newUnreadCounts[doc.id] = unreadCount;
           
           chatsMap.set(doc.id, {
             id: doc.id,
@@ -198,6 +217,8 @@
             lastMessageTime: chat.lastMessageTime ? chat.lastMessageTime.toDate?.() || new Date(chat.lastMessageTime) : new Date(0)
           });
         }
+        
+        unreadCounts = newUnreadCounts;
         
         // Преобразуем Map в массив
         allChats = Array.from(chatsMap.values());
@@ -267,8 +288,11 @@
         
         const lastMessage = chat.lastMessage || 'Нет сообщений';
         
+        // Экранируем JSON для onclick
+        const chatJson = JSON.stringify(chat).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        
         return `
-          <div class="chat-item ${unreadCount > 0 ? 'has-unread' : ''}" onclick="selectChat(${JSON.stringify(chat).replace(/'/g, "\\'")})">
+          <div class="chat-item ${unreadCount > 0 ? 'has-unread' : ''}" onclick='selectChat(${chatJson})'>
             <div class="chat-avatar-placeholder">${avatarContent}</div>
             <div class="chat-info">
               <div class="chat-name">${chat.displayName} ${unreadBadge}</div>
@@ -300,6 +324,7 @@
 
     // ---------- Выбор чата ----------
     function selectChat(chat) {
+      console.log('Selecting chat:', chat);
       selectedChat = chat;
       currentChatId = chat.id;
 
@@ -408,7 +433,7 @@
           
           // Для группового чата собираем информацию об отправителях
           const senderIds = new Set();
-          if (selectedChat.isGroup) {
+          if (selectedChat && selectedChat.isGroup) {
             snapshot.forEach(doc => {
               const msg = doc.data();
               if (msg.senderId !== currentUser.uid) {
@@ -432,7 +457,7 @@
             
             // Для группового чата показываем имя отправителя
             let senderInfo = '';
-            if (selectedChat.isGroup && !isMyMessage) {
+            if (selectedChat && selectedChat.isGroup && !isMyMessage) {
               const sender = userCache[msg.senderId];
               if (sender) {
                 senderInfo = `<div class="message-sender">${sender.nickname} ${sender.tag}</div>`;
@@ -500,6 +525,8 @@
 
     // ---------- Глобальное прослушивание новых сообщений ----------
     function listenForNewMessages() {
+      if (!currentUser) return;
+      
       db.collection('chats')
         .where('participants', 'array-contains', currentUser.uid)
         .onSnapshot(snapshot => {
@@ -586,6 +613,7 @@
           name: groupName,
           participants: participants,
           isGroup: true,
+          createdBy: currentUser.uid,
           createdAt: firebase.firestore.FieldValue.serverTimestamp(),
           lastMessage: null,
           lastMessageTime: null
@@ -604,17 +632,104 @@
       }
     }
 
+    // ---------- Информация о групповом чате и удаление ----------
+    async function openChatInfo(chatId) {
+      if (!selectedChat || !selectedChat.isGroup) return;
+      
+      try {
+        const chatDoc = await db.collection('chats').doc(chatId).get();
+        const chat = chatDoc.data();
+        
+        // Собираем информацию об участниках
+        let participantsHTML = '<h4>Участники:</h4><ul>';
+        for (const userId of chat.participants) {
+          const userData = await getUserById(userId);
+          if (userData) {
+            const isCreator = userId === chat.createdBy ? ' (создатель)' : '';
+            participantsHTML += `<li>${userData.nickname} ${userData.tag}${isCreator}</li>`;
+          }
+        }
+        participantsHTML += '</ul>';
+        
+        document.getElementById('groupInfoName').textContent = chat.name || 'Беседа';
+        document.getElementById('groupParticipants').innerHTML = participantsHTML;
+        
+        // Показываем кнопку удаления только создателю
+        const deleteBtn = document.getElementById('deleteGroupBtn');
+        if (chat.createdBy === currentUser.uid) {
+          deleteBtn.style.display = 'inline-block';
+        } else {
+          deleteBtn.style.display = 'none';
+        }
+        
+        document.getElementById('groupInfoModal').style.display = 'flex';
+        
+      } catch (error) {
+        console.error('Ошибка загрузки информации о беседе:', error);
+      }
+    }
+
+    function hideGroupInfoModal() {
+      document.getElementById('groupInfoModal').style.display = 'none';
+    }
+
+    async function deleteCurrentGroup() {
+      if (!selectedChat || !selectedChat.isGroup) return;
+      
+      if (!confirm('Вы уверены, что хотите удалить эту беседу? Это действие нельзя отменить.')) return;
+      
+      try {
+        // Удаляем все сообщения в чате
+        const messagesSnapshot = await db.collection('chats').doc(selectedChat.id)
+          .collection('messages')
+          .get();
+        
+        const batch = db.batch();
+        messagesSnapshot.forEach(doc => {
+          batch.delete(doc.ref);
+        });
+        
+        // Удаляем сам чат
+        batch.delete(db.collection('chats').doc(selectedChat.id));
+        
+        await batch.commit();
+        
+        hideGroupInfoModal();
+        
+        // Возвращаемся в режим выбора чата
+        exitChatMode();
+        
+        alert('Беседа удалена');
+        
+      } catch (error) {
+        console.error('Ошибка удаления беседы:', error);
+        alert('Ошибка при удалении беседы');
+      }
+    }
+
     // ---------- Переключение режимов на мобилках ----------
     function enterChatMode() {
       isChatMode = true;
       document.body.classList.add('chat-mode');
       document.getElementById('mobileMenuBtn').style.display = 'none';
+      
+      // На мобильных устройствах скрываем список чатов
+      const chatsSidebar = document.getElementById('chatsSidebar');
+      if (chatsSidebar) {
+        chatsSidebar.style.display = 'none';
+      }
     }
 
     function exitChatMode() {
       isChatMode = false;
       document.body.classList.remove('chat-mode');
       document.getElementById('mobileMenuBtn').style.display = 'flex';
+      
+      // Показываем список чатов
+      const chatsSidebar = document.getElementById('chatsSidebar');
+      if (chatsSidebar) {
+        chatsSidebar.style.display = 'flex';
+      }
 
       if (unsubscribeMessages) {
         unsubscribeMessages();
@@ -629,11 +744,6 @@
 
     function openUserProfile(userId) {
       window.location.href = `user.html?id=${userId}`;
-    }
-
-    function openChatInfo(chatId) {
-      // TODO: открыть информацию о групповом чате
-      console.log('Open chat info:', chatId);
     }
 
     // ---------- Мобильное меню (бургер) ----------
@@ -654,6 +764,12 @@
         document.body.classList.remove('chat-mode');
         document.getElementById('mobileMenuBtn').style.display = 'flex';
         document.getElementById('messageInputArea').style.display = 'none';
+        
+        // На мобильных устройствах показываем список чатов
+        const chatsSidebar = document.getElementById('chatsSidebar');
+        if (chatsSidebar) {
+          chatsSidebar.style.display = 'flex';
+        }
       }
     });
 
@@ -661,8 +777,20 @@
       if (window.innerWidth > 768) {
         document.body.classList.remove('chat-mode');
         document.getElementById('mobileMenuBtn').style.display = 'none';
+        
+        // На десктопе всегда показываем список чатов
+        const chatsSidebar = document.getElementById('chatsSidebar');
+        if (chatsSidebar) {
+          chatsSidebar.style.display = 'flex';
+        }
       } else {
         document.getElementById('mobileMenuBtn').style.display = isChatMode ? 'none' : 'flex';
+        
+        // На мобильных устройствах скрываем/показываем список чатов в зависимости от режима
+        const chatsSidebar = document.getElementById('chatsSidebar');
+        if (chatsSidebar) {
+          chatsSidebar.style.display = isChatMode ? 'none' : 'flex';
+        }
       }
     });
   </script>
