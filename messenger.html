@@ -60,12 +60,6 @@
   </div>
 
   <script src="firebase-config.js"></script>
-auth.onAuthStateChanged((user) => {
-  if (!user || !user.emailVerified) {
-    window.location.href = 'index.html';
-  }
-});
-
   <script>
     // ---------- Глобальные переменные ----------
     let currentUser = null;
@@ -95,63 +89,76 @@ auth.onAuthStateChanged((user) => {
     });
 
     // ---------- Загрузка списка пользователей ----------
-    // Загрузка списка пользователей
-async function loadUsers() {
-  const usersList = document.getElementById('usersList');
-  usersList.innerHTML = '<div class="loading">Загрузка пользователей...</div>';
-  
-  try {
-    // 1. Получаем всех пользователей из Firestore
-    const usersSnapshot = await db.collection('users').get();
-    const allUsersMap = new Map();
-    usersSnapshot.forEach(doc => {
-      if (doc.id !== currentUser.uid) {
-        allUsersMap.set(doc.id, { id: doc.id, ...doc.data() });
+    async function loadUsers() {
+      const usersList = document.getElementById('usersList');
+      usersList.innerHTML = '<div class="loading">Загрузка пользователей...</div>';
+      
+      try {
+        // 1. Получаем всех пользователей из Firestore
+        const usersSnapshot = await db.collection('users').get();
+        const allUsersMap = new Map();
+        usersSnapshot.forEach(doc => {
+          if (doc.id !== currentUser.uid) {
+            allUsersMap.set(doc.id, { id: doc.id, ...doc.data() });
+          }
+        });
+
+        // 2. Получаем все чаты текущего пользователя
+        const chatsSnapshot = await db.collection('chats')
+          .where('participants', 'array-contains', currentUser.uid)
+          .get();
+
+        // 3. Собираем ID пользователей, с которыми есть чаты
+        const chatUserIds = new Set();
+        chatsSnapshot.forEach(doc => {
+          const chat = doc.data();
+          const otherUserId = chat.participants.find(id => id !== currentUser.uid);
+          if (otherUserId) {
+            chatUserIds.add(otherUserId);
+          }
+        });
+
+        // 4. Формируем список пользователей для отображения
+        // По умолчанию показываем только тех, с кем есть чаты
+        allUsers = []; // полный список для поиска
+        const chatUsers = []; // только с чатами
+
+        allUsersMap.forEach((user, id) => {
+          allUsers.push(user);
+          if (chatUserIds.has(id)) {
+            chatUsers.push(user);
+          }
+        });
+
+        // 5. Отображаем пользователей с чатами
+        if (chatUsers.length === 0) {
+          usersList.innerHTML = '<div class="no-users">Нет активных чатов. Найдите пользователя через поиск.</div>';
+        } else {
+          displayUsers(chatUsers);
+        }
+
+        // Сохраняем полный список для поиска
+        window.allUsers = allUsers;
+
+        // Проверяем, есть ли параметр userId в URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const targetUserId = urlParams.get('userId');
+
+        if (targetUserId) {
+          // Ищем пользователя в allUsers
+          const targetUser = allUsers.find(u => u.id === targetUserId);
+          if (targetUser) {
+            setTimeout(() => {
+              selectUser(targetUser.id, targetUser.nickname, targetUser.tag);
+            }, 500); // Небольшая задержка для загрузки
+          }
+        }
+        
+      } catch (error) {
+        console.error('Ошибка загрузки:', error);
+        usersList.innerHTML = '<div class="error">Ошибка загрузки</div>';
       }
-    });
-
-    // 2. Получаем все чаты текущего пользователя
-    const chatsSnapshot = await db.collection('chats')
-      .where('participants', 'array-contains', currentUser.uid)
-      .get();
-
-    // 3. Собираем ID пользователей, с которыми есть чаты
-    const chatUserIds = new Set();
-    chatsSnapshot.forEach(doc => {
-      const chat = doc.data();
-      const otherUserId = chat.participants.find(id => id !== currentUser.uid);
-      if (otherUserId) {
-        chatUserIds.add(otherUserId);
-      }
-    });
-
-    // 4. Формируем список пользователей для отображения
-    // По умолчанию показываем только тех, с кем есть чаты
-    allUsers = []; // полный список для поиска
-    const chatUsers = []; // только с чатами
-
-    allUsersMap.forEach((user, id) => {
-      allUsers.push(user);
-      if (chatUserIds.has(id)) {
-        chatUsers.push(user);
-      }
-    });
-
-    // 5. Отображаем пользователей с чатами
-    if (chatUsers.length === 0) {
-      usersList.innerHTML = '<div class="no-users">Нет активных чатов. Найдите пользователя через поиск.</div>';
-    } else {
-      displayUsers(chatUsers);
     }
-
-    // Сохраняем полный список для поиска
-    window.allUsers = allUsers;
-    
-  } catch (error) {
-    console.error('Ошибка загрузки:', error);
-    usersList.innerHTML = '<div class="error">Ошибка загрузки</div>';
-  }
-}
 
     function displayUsers(users) {
       const usersList = document.getElementById('usersList');
@@ -173,55 +180,55 @@ async function loadUsers() {
     }
 
     function searchUsers() {
-  const searchText = document.getElementById('searchInput').value.toLowerCase();
-  
-  if (!searchText) {
-    // Если поиск пустой, показываем только пользователей с чатами
-    loadUsers(); // перезагружаем список
-    return;
-  }
-  
-  // Ищем по всем пользователям
-  const filtered = window.allUsers.filter(user =>
-    (user.nickname && user.nickname.toLowerCase().includes(searchText)) ||
-    (user.tag && user.tag.toLowerCase().includes(searchText))
-  );
-  
-  if (filtered.length === 0) {
-    document.getElementById('usersList').innerHTML = '<div class="no-users">Ничего не найдено</div>';
-  } else {
-    displayUsers(filtered);
-  }
-}
+      const searchText = document.getElementById('searchInput').value.toLowerCase();
+      
+      if (!searchText) {
+        // Если поиск пустой, показываем только пользователей с чатами
+        loadUsers(); // перезагружаем список
+        return;
+      }
+      
+      // Ищем по всем пользователям
+      const filtered = window.allUsers.filter(user =>
+        (user.nickname && user.nickname.toLowerCase().includes(searchText)) ||
+        (user.tag && user.tag.toLowerCase().includes(searchText))
+      );
+      
+      if (filtered.length === 0) {
+        document.getElementById('usersList').innerHTML = '<div class="no-users">Ничего не найдено</div>';
+      } else {
+        displayUsers(filtered);
+      }
+    }
 
     // ---------- Выбор пользователя для чата ----------
     function selectUser(userId, nickname, tag) {
-  selectedUser = { id: userId, nickname, tag };
+      selectedUser = { id: userId, nickname, tag };
 
-  const chatHeader = document.getElementById('chatHeader');
-  chatHeader.innerHTML = `
-  <div class="selected-user" onclick="openUserProfile('${userId}')">
-    <button class="mobile-back-btn" onclick="event.stopPropagation(); exitChatMode()">←</button>
-    <div class="chat-user-avatar-placeholder">${nickname.charAt(0).toUpperCase()}</div>
-    <div class="chat-user-info">
-      <h3>${nickname}</h3>
-      <p>${tag}</p>
-    </div>
-  </div>
-`;
+      const chatHeader = document.getElementById('chatHeader');
+      chatHeader.innerHTML = `
+        <div class="selected-user" onclick="openUserProfile('${userId}')">
+          <button class="mobile-back-btn" onclick="event.stopPropagation(); exitChatMode()"><</button>
+          <div class="chat-user-avatar-placeholder">${nickname.charAt(0).toUpperCase()}</div>
+          <div class="chat-user-info">
+            <h3>${nickname}</h3>
+            <p>${tag}</p>
+          </div>
+        </div>
+      `;
 
-  document.getElementById('messageInputArea').style.display = 'flex';
+      document.getElementById('messageInputArea').style.display = 'flex';
 
-  if (window.innerWidth <= 768) {
-    enterChatMode();
-  }
+      if (window.innerWidth <= 768) {
+        enterChatMode();
+      }
 
-  createOrGetChat();
-}
+      createOrGetChat();
+    }
 
-function openUserProfile(userId) {
-  window.location.href = `user.html?id=${userId}`;
-}
+    function openUserProfile(userId) {
+      window.location.href = `user.html?id=${userId}`;
+    }
 
     // ---------- Переключение режимов на мобилках ----------
     function enterChatMode() {

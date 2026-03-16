@@ -12,7 +12,7 @@
 <body>
   <div class="container">
     <div class="header">
-      <a href="messenger.html" class="back-btn"><</a>
+      <a href="messenger.html" class="back-btn" id="backButton"><</a>
     </div>
     
     <div id="userProfileContent" class="profile-page">
@@ -21,11 +21,6 @@
   </div>
 
   <script src="firebase-config.js"></script>
-auth.onAuthStateChanged((user) => {
-  if (!user || !user.emailVerified) {
-    window.location.href = 'index.html';
-  }
-});
   <script>
     // Получаем ID пользователя из URL
     const urlParams = new URLSearchParams(window.location.search);
@@ -34,6 +29,9 @@ auth.onAuthStateChanged((user) => {
     if (!userId) {
       window.location.href = 'messenger.html';
     }
+
+    // Обновляем ссылку "назад" с userId
+    document.getElementById('backButton').href = `messenger.html?userId=${userId}`;
 
     auth.onAuthStateChanged(async (user) => {
       if (!user || !user.emailVerified) {
@@ -73,10 +71,6 @@ auth.onAuthStateChanged((user) => {
               <span>${userData.tag}</span>
             </div>
           </div>
-          
-          <button onclick="startChat('${userId}', '${userData.nickname}', '${userData.tag}')" class="chat-btn">
-            Написать сообщение
-          </button>
         `;
         
       } catch (error) {
@@ -85,10 +79,6 @@ auth.onAuthStateChanged((user) => {
         `;
       }
     });
-    
-    function startChat(userId, nickname, tag) {
-      window.location.href = `messenger.html?user=${userId}`;
-    }
   </script>
 </body>
 </html>
