@@ -661,54 +661,68 @@
       }
     }
 
-    // ---------- Выбор чата ----------
-    function selectChat(chat) {
-      console.log('Selecting chat:', chat);
-      selectedChat = chat;
-      currentChatId = chat.id;
+    // ---------- ИСПРАВЛЕННЫЙ выбор чата ----------
+function selectChat(chat) {
+  console.log('Selecting chat:', chat);
+  
+  // Сначала очищаем предыдущий чат
+  if (unsubscribeMessages) {
+    unsubscribeMessages();
+    unsubscribeMessages = null;
+  }
+  
+  // Очищаем контейнер сообщений сразу
+  const messagesContainer = document.getElementById('messagesContainer');
+  messagesContainer.innerHTML = '<div class="loading">Загрузка сообщений...</div>';
+  
+  // Обновляем выбранный чат
+  selectedChat = chat;
+  currentChatId = chat.id;
 
-      const chatHeader = document.getElementById('chatHeader');
-      
-      let headerContent = '';
-      if (chat.isGroup) {
-        const participantsCount = chat.participants ? chat.participants.length : 2;
-        headerContent = `
-          <div class="selected-chat" onclick="openChatInfo('${chat.id}')">
-            <button class="mobile-back-btn" onclick="event.stopPropagation(); exitChatMode()"><</button>
-            <div class="chat-avatar-placeholder large">👥 ${chat.displayName.charAt(0).toUpperCase()}</div>
-            <div class="chat-info">
-              <h3>${chat.displayName}</h3>
-              <p>${participantsCount} участников</p>
-            </div>
-          </div>
-        `;
-      } else {
-        const otherUserId = chat.participants.find(id => id !== currentUser.uid);
-        headerContent = `
-          <div class="selected-chat" onclick="openUserProfile('${otherUserId}')">
-            <button class="mobile-back-btn" onclick="event.stopPropagation(); exitChatMode()"><</button>
-            <div class="chat-avatar-placeholder large">${chat.displayName.charAt(0).toUpperCase()}</div>
-            <div class="chat-info">
-              <h3>${chat.displayName}</h3>
-              <p>${chat.displayAvatar}</p>
-            </div>
-          </div>
-        `;
-      }
-      
-      chatHeader.innerHTML = headerContent;
-      document.getElementById('messageInputArea').style.display = 'flex';
+  // Обновляем шапку
+  const chatHeader = document.getElementById('chatHeader');
+  
+  let headerContent = '';
+  if (chat.isGroup) {
+    const participantsCount = chat.participants ? chat.participants.length : 2;
+    headerContent = `
+      <div class="selected-chat" onclick="openChatInfo('${chat.id}')">
+        <button class="mobile-back-btn" onclick="event.stopPropagation(); exitChatMode()"><</button>
+        <div class="chat-avatar-placeholder large">👥 ${chat.displayName.charAt(0).toUpperCase()}</div>
+        <div class="chat-info">
+          <h3>${chat.displayName}</h3>
+          <p>${participantsCount} участников</p>
+        </div>
+      </div>
+    `;
+  } else {
+    const otherUserId = chat.participants.find(id => id !== currentUser.uid);
+    headerContent = `
+      <div class="selected-chat" onclick="openUserProfile('${otherUserId}')">
+        <button class="mobile-back-btn" onclick="event.stopPropagation(); exitChatMode()"><</button>
+        <div class="chat-avatar-placeholder large">${chat.displayName.charAt(0).toUpperCase()}</div>
+        <div class="chat-info">
+          <h3>${chat.displayName}</h3>
+          <p>${chat.displayAvatar}</p>
+        </div>
+      </div>
+    `;
+  }
+  
+  chatHeader.innerHTML = headerContent;
+  document.getElementById('messageInputArea').style.display = 'flex';
 
-      if (window.innerWidth <= 768) {
-        enterChatMode();
-      }
+  if (window.innerWidth <= 768) {
+    enterChatMode();
+  }
 
-      loadMessages();
-      
-      if (unreadCounts[chat.id] > 0) {
-        markMessagesAsRead(chat.id);
-      }
-    }
+  // Загружаем сообщения
+  loadMessages();
+  
+  if (unreadCounts[chat.id] > 0) {
+    markMessagesAsRead(chat.id);
+  }
+}
 
     // ---------- Отметить сообщения как прочитанные ----------
     async function markMessagesAsRead(chatId) {
@@ -749,13 +763,20 @@
       }
     }
 
-    // ---------- ОПТИМИЗИРОВАННАЯ загрузка сообщений (с датами) ----------
+    // ---------- ОПТИМИЗИРОВАННАЯ загрузка сообщений (с защитой от гонки) ----------
 function loadMessages() {
-  if (!currentChatId) return;
+  // ВАЖНО: проверяем, что мы всё ещё в этом чате
+  if (!currentChatId || !selectedChat) {
+    console.log('loadMessages: нет активного чата, выходим');
+    return;
+  }
+  
   const messagesContainer = document.getElementById('messagesContainer');
+  const currentChatIdAtStart = currentChatId; // Запоминаем, какой чат загружаем
   
   if (unsubscribeMessages) {
     unsubscribeMessages();
+    unsubscribeMessages = null;
   }
   
   // Добавляем индикатор загрузки
@@ -765,6 +786,12 @@ function loadMessages() {
     .collection('messages')
     .orderBy('timestamp', 'asc')
     .onSnapshot(async snapshot => {
+      
+      // ВАЖНО: проверяем, что мы всё ещё в том же чате
+      if (currentChatId !== currentChatIdAtStart || !selectedChat) {
+        console.log('Чат изменился во время загрузки, игнорируем');
+        return;
+      }
       
       // Если снапшот пустой
       if (snapshot.empty) {
@@ -782,11 +809,17 @@ function loadMessages() {
         }
       });
       
-      // Загружаем ВСЕХ отправителей одним запросом (для группового чата)
+      // Загружаем ВСЕХ отправителей одним запросом
       const senderCache = {};
       if (senderIds.size > 0) {
         const userIds = Array.from(senderIds);
         for (let i = 0; i < userIds.length; i += 10) {
+          // Проверяем, не ушли ли мы из чата
+          if (currentChatId !== currentChatIdAtStart || !selectedChat) {
+            console.log('Чат изменился во время загрузки пользователей, игнорируем');
+            return;
+          }
+          
           const batch = userIds.slice(i, i + 10);
           const usersSnapshot = await db.collection('users')
             .where('__name__', 'in', batch)
@@ -796,6 +829,12 @@ function loadMessages() {
             senderCache[doc.id] = doc.data();
           });
         }
+      }
+      
+      // Ещё одна проверка перед отрисовкой
+      if (currentChatId !== currentChatIdAtStart || !selectedChat) {
+        console.log('Чат изменился перед отрисовкой, игнорируем');
+        return;
       }
       
       // Отмечаем прочитанные (если нужно)
@@ -883,14 +922,21 @@ function loadMessages() {
         `;
       });
       
-      messagesContainer.innerHTML = html;
+      // Финальная проверка перед отрисовкой
+      if (currentChatId !== currentChatIdAtStart || !selectedChat) {
+        console.log('Чат изменился перед финальной отрисовкой, игнорируем');
+        return;
+      }
       
-      // Мгновенная прокрутка вниз БЕЗ АНИМАЦИИ
+      messagesContainer.innerHTML = html;
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
       
     }, error => {
       console.error('Ошибка загрузки сообщений:', error);
-      messagesContainer.innerHTML = '<div class="error">Ошибка загрузки сообщений</div>';
+      // Проверяем, что мы всё ещё в этом чате
+      if (currentChatId === currentChatIdAtStart && selectedChat) {
+        messagesContainer.innerHTML = '<div class="error">Ошибка загрузки сообщений</div>';
+      }
     });
 }
 
@@ -1254,26 +1300,30 @@ function loadMessages() {
       history.pushState({ chatMode: true }, '', window.location.href);
     }
 
-    function exitChatMode() {
-      isChatMode = false;
-      document.body.classList.remove('chat-mode');
-      document.getElementById('mobileMenuBtn').style.display = 'flex';
-      
-      const chatsSidebar = document.getElementById('chatsSidebar');
-      if (chatsSidebar) {
-        chatsSidebar.style.display = 'flex';
-      }
+    // ---------- ИСПРАВЛЕННЫЙ выход из чата ----------
+function exitChatMode() {
+  isChatMode = false;
+  document.body.classList.remove('chat-mode');
+  document.getElementById('mobileMenuBtn').style.display = 'flex';
+  
+  const chatsSidebar = document.getElementById('chatsSidebar');
+  if (chatsSidebar) {
+    chatsSidebar.style.display = 'flex';
+  }
 
-      if (unsubscribeMessages) {
-        unsubscribeMessages();
-        unsubscribeMessages = null;
-      }
-      selectedChat = null;
-      currentChatId = null;
-      document.getElementById('chatHeader').innerHTML = '<div class="no-chat-selected">Выберите чат для начала общения</div>';
-      document.getElementById('messagesContainer').innerHTML = '';
-      document.getElementById('messageInputArea').style.display = 'none';
-    }
+  // Отписываемся от сообщений
+  if (unsubscribeMessages) {
+    unsubscribeMessages();
+    unsubscribeMessages = null;
+  }
+  
+  // Очищаем всё
+  selectedChat = null;
+  currentChatId = null;
+  document.getElementById('chatHeader').innerHTML = '<div class="no-chat-selected">Выберите чат для начала общения</div>';
+  document.getElementById('messagesContainer').innerHTML = '';
+  document.getElementById('messageInputArea').style.display = 'none';
+}
 
     // ---------- Обработка системной кнопки "назад" на телефоне ----------
     window.addEventListener('popstate', function(event) {
