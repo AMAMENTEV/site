@@ -102,7 +102,6 @@
     <div class="chats-sidebar" id="chatsSidebar">
       <div class="chats-header">
         <h2>Чаты</h2>
-        <p>С кем есть чат</p>
       </div>
 
       <div class="search-box">
@@ -750,7 +749,7 @@
       }
     }
 
-    // ---------- ОПТИМИЗИРОВАННАЯ загрузка сообщений (без лишней прокрутки) ----------
+    // ---------- ОПТИМИЗИРОВАННАЯ загрузка сообщений (с датами) ----------
 function loadMessages() {
   if (!currentChatId) return;
   const messagesContainer = document.getElementById('messagesContainer');
@@ -818,18 +817,27 @@ function loadMessages() {
         unreadCounts[currentChatId] = 0;
       }
       
-      // Генерируем HTML
+      // Генерируем HTML с датами
       let html = '';
+      let lastDate = '';
       
       snapshot.forEach(doc => {
         const msg = doc.data();
         const isMyMessage = msg.senderId === currentUser.uid;
         
-        // Форматируем время
+        // Форматируем дату и время
         let time = '';
+        let messageDate = '';
         if (msg.timestamp) {
           const date = msg.timestamp.toDate();
           time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          messageDate = date.toLocaleDateString();
+        }
+        
+        // Добавляем разделитель даты, если день изменился
+        if (messageDate && messageDate !== lastDate) {
+          html += `<div class="date-separator">${messageDate}</div>`;
+          lastDate = messageDate;
         }
         
         // Проверяем удаление
@@ -885,6 +893,7 @@ function loadMessages() {
       messagesContainer.innerHTML = '<div class="error">Ошибка загрузки сообщений</div>';
     });
 }
+
 
     // ---------- Отправка сообщения ----------
     async function sendMessage() {
