@@ -9,7 +9,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
   <style>
-    /* Временные стили для системных сообщений */
+    /* Системные сообщения по центру */
     .message.system {
       align-self: center !important;
       background: #f1f5f9 !important;
@@ -25,6 +25,42 @@
     
     .message.system .message-time {
       display: none !important;
+    }
+
+    /* Исправление для мобильной версии */
+    @media (max-width: 768px) {
+      .messenger-container {
+        height: 100vh;
+        height: -webkit-fill-available;
+        height: 100dvh;
+        overflow: hidden;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding-bottom: env(safe-area-inset-bottom, 0);
+      }
+      
+      .chats-sidebar {
+        height: 100%;
+        padding-bottom: env(safe-area-inset-bottom, 20px);
+        overflow-y: auto;
+      }
+      
+      .chat-area {
+        height: 100%;
+        padding-bottom: env(safe-area-inset-bottom, 0);
+      }
+      
+      .messages-container {
+        height: calc(100% - 130px);
+        padding-bottom: env(safe-area-inset-bottom, 10px);
+      }
+      
+      .message-input-area {
+        padding-bottom: max(12px, env(safe-area-inset-bottom, 12px));
+      }
     }
   </style>
 </head>
@@ -158,7 +194,7 @@
     let selectedChat = null;
     let currentChatId = null;
     let unsubscribeMessages = null;
-    let unsubscribeChats = null; // Для отписки от слушателя чатов
+    let unsubscribeChats = null;
     let allChats = [];
     let allUsers = [];
     let allUsersForModal = [];
@@ -230,7 +266,6 @@
     function listenForChats() {
       if (!currentUser) return;
       
-      // Отписываемся от предыдущего слушателя, если был
       if (unsubscribeChats) {
         unsubscribeChats();
       }
@@ -278,15 +313,22 @@
               
               let lastMessage = null;
               let lastMessageTime = chat.lastMessageTime ? chat.lastMessageTime.toDate?.() || new Date(chat.lastMessageTime) : new Date(0);
+              let hasAnyMessage = false;
               
               for (const msgDoc of lastMsgQuery.docs) {
                 const msg = msgDoc.data();
+                hasAnyMessage = true;
                 if (!msg.deletedFor || 
                     (!msg.deletedFor.includes('everyone') && !msg.deletedFor.includes(currentUser.uid))) {
                   lastMessage = msg.text;
                   lastMessageTime = msg.timestamp ? msg.timestamp.toDate?.() || new Date(msg.timestamp) : lastMessageTime;
                   break;
                 }
+              }
+              
+              // Если нет ни одного сообщения, не показываем чат в списке
+              if (!hasAnyMessage && !chat.isGroup) {
+                return; // Не добавляем в список
               }
               
               // Считаем непрочитанные
@@ -331,8 +373,16 @@
           });
           
           Promise.all(chatPromises).then(() => {
+            // Фильтруем чаты без сообщений
+            const filteredChats = chats.filter(chat => {
+              // Групповые чаты показываем всегда
+              if (chat.isGroup) return true;
+              // Личные чаты показываем только если есть сообщения
+              return chat.lastMessage !== null;
+            });
+            
             unreadCounts = newUnreadCounts;
-            allChats = chats;
+            allChats = filteredChats;
             
             allChats.sort((a, b) => {
               const unreadA = unreadCounts[a.id] || 0;
@@ -557,6 +607,7 @@
           };
           selectChat(chat);
         } else {
+          // Создаем чат, но он появится в списке только после первого сообщения
           const newChatRef = await db.collection('chats').add({
             participants: [currentUser.uid, userId],
             isGroup: false,
@@ -565,6 +616,7 @@
             lastMessageTime: null
           });
           
+          // Сразу открываем чат, но в списке он не появится
           const chat = {
             id: newChatRef.id,
             participants: [currentUser.uid, userId],
@@ -626,13 +678,12 @@
 
       loadMessages();
       
-      // Сбрасываем счетчик непрочитанных
       if (unreadCounts[chat.id] > 0) {
         markMessagesAsRead(chat.id);
       }
     }
 
-    // ---------- ИСПРАВЛЕННАЯ функция отметки прочитанных ----------
+    // ---------- Отметить сообщения как прочитанные ----------
     async function markMessagesAsRead(chatId) {
       try {
         const unreadSnapshot = await db.collection('chats').doc(chatId)
@@ -659,12 +710,10 @@
         
         await batch.commit();
         
-        // Обновляем счетчик в памяти
         unreadCounts[chatId] = 0;
         
-        // Обновляем отображение чатов в реальном времени
+        // Обновляем слушатель чатов
         if (unsubscribeChats) {
-          // Перезапускаем слушатель чатов для обновления счетчиков
           listenForChats();
         }
         
@@ -706,7 +755,6 @@
           
           if (hasNewMessageFromOther) {
             await batch.commit();
-            // Обновляем счетчик в памяти
             unreadCounts[currentChatId] = 0;
           }
           
@@ -864,6 +912,8 @@
         });
         
         document.getElementById('groupName').value = '';
+        
+        // Чат появится в слушателе автоматически
         
       } catch (error) {
         console.error('Ошибка создания беседы:', error);
@@ -1121,7 +1171,7 @@
       }
     }
 
-    // ---------- ИСПРАВЛЕННОЕ: Переключение режимов на мобилках ----------
+    // ---------- Переключение режимов на мобилках ----------
     function enterChatMode() {
       isChatMode = true;
       document.body.classList.add('chat-mode');
@@ -1132,7 +1182,6 @@
         chatsSidebar.style.display = 'none';
       }
       
-      // Добавляем обработчик системной кнопки "назад"
       history.pushState({ chatMode: true }, '', window.location.href);
     }
 
