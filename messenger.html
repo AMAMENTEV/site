@@ -750,109 +750,160 @@
       }
     }
 
-    // ---------- Загрузка сообщений ----------
-    function loadMessages() {
-      if (!currentChatId) return;
-      const messagesContainer = document.getElementById('messagesContainer');
+    // ---------- ОПТИМИЗИРОВАННАЯ загрузка сообщений ----------
+function loadMessages() {
+  if (!currentChatId) return;
+  const messagesContainer = document.getElementById('messagesContainer');
+  
+  if (unsubscribeMessages) {
+    unsubscribeMessages();
+  }
+  
+  // Добавляем индикатор загрузки
+  messagesContainer.innerHTML = '<div class="loading">Загрузка сообщений...</div>';
+  
+  unsubscribeMessages = db.collection('chats').doc(currentChatId)
+    .collection('messages')
+    .orderBy('timestamp', 'asc')
+    .onSnapshot(async snapshot => {
       
-      if (unsubscribeMessages) {
-        unsubscribeMessages();
+      // Если снапшот пустой
+      if (snapshot.empty) {
+        messagesContainer.innerHTML = '<div class="no-messages">Нет сообщений. Напишите что-нибудь!</div>';
+        return;
       }
       
-      unsubscribeMessages = db.collection('chats').doc(currentChatId)
-        .collection('messages')
-        .orderBy('timestamp', 'asc')
-        .onSnapshot(async snapshot => {
-          if (snapshot.empty) {
-            messagesContainer.innerHTML = '<div class="no-messages">Нет сообщений. Напишите что-нибудь!</div>';
+      // Собираем ID всех отправителей для группового чата (один раз)
+      const senderIds = new Set();
+      const systemMessageIds = new Set();
+      
+      snapshot.forEach(doc => {
+        const msg = doc.data();
+        if (msg.isSystem) {
+          systemMessageIds.add(doc.id);
+        } else if (selectedChat && selectedChat.isGroup && msg.senderId !== currentUser.uid) {
+          senderIds.add(msg.senderId);
+        }
+      });
+      
+      // Загружаем ВСЕХ отправителей одним запросом (для группового чата)
+      const senderCache = {};
+      if (senderIds.size > 0) {
+        // Загружаем пачкой по 10 пользователей (Firestore ограничение)
+        const userIds = Array.from(senderIds);
+        for (let i = 0; i < userIds.length; i += 10) {
+          const batch = userIds.slice(i, i + 10);
+          const usersSnapshot = await db.collection('users')
+            .where('__name__', 'in', batch)
+            .get();
+          
+          usersSnapshot.forEach(doc => {
+            senderCache[doc.id] = doc.data();
+          });
+        }
+      }
+      
+      // Отмечаем прочитанные (если нужно)
+      let hasNewMessageFromOther = false;
+      const batch = db.batch();
+      
+      snapshot.docChanges().forEach(change => {
+        if (change.type === 'added') {
+          const msg = change.doc.data();
+          if (msg.senderId !== currentUser.uid && !msg.isSystem) {
+            hasNewMessageFromOther = true;
+            batch.update(change.doc.ref, { read: true });
+          }
+        }
+      });
+      
+      if (hasNewMessageFromOther) {
+        await batch.commit();
+        unreadCounts[currentChatId] = 0;
+      }
+      
+      // Генерируем HTML (все данные уже загружены)
+      let html = '';
+      let lastDate = '';
+      
+      snapshot.forEach(doc => {
+        const msg = doc.data();
+        const isMyMessage = msg.senderId === currentUser.uid;
+        
+        // Форматируем время
+        let time = '';
+        let messageDate = '';
+        if (msg.timestamp) {
+          const date = msg.timestamp.toDate();
+          time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          messageDate = date.toLocaleDateString();
+        }
+        
+        // Добавляем разделитель даты
+        if (messageDate && messageDate !== lastDate) {
+          html += `<div class="date-separator">${messageDate}</div>`;
+          lastDate = messageDate;
+        }
+        
+        // Проверяем удаление
+        if (msg.deletedFor) {
+          if (msg.deletedFor.includes('everyone') || 
+              (msg.deletedFor && msg.deletedFor.includes(currentUser.uid))) {
             return;
           }
-          
-          let hasNewMessageFromOther = false;
-          const batch = db.batch();
-          
-          snapshot.docChanges().forEach(change => {
-            if (change.type === 'added') {
-              const msg = change.doc.data();
-              if (msg.senderId !== currentUser.uid && !msg.isSystem) {
-                hasNewMessageFromOther = true;
-                batch.update(change.doc.ref, { read: true });
-              }
-            }
-          });
-          
-          if (hasNewMessageFromOther) {
-            await batch.commit();
-            unreadCounts[currentChatId] = 0;
+        }
+        
+        // Системные сообщения
+        if (msg.isSystem) {
+          html += `
+            <div class="message system">
+              <div class="message-content">${msg.text}</div>
+            </div>
+          `;
+          return;
+        }
+        
+        // Информация об отправителе для группового чата
+        let senderInfo = '';
+        if (selectedChat && selectedChat.isGroup && !isMyMessage) {
+          const sender = senderCache[msg.senderId];
+          if (sender) {
+            senderInfo = `<div class="message-sender">${sender.nickname || '?'} ${sender.tag || ''}</div>`;
+          } else {
+            // Если не загрузился, показываем заглушку
+            senderInfo = `<div class="message-sender">Пользователь</div>`;
           }
-          
-          let html = '';
-          
-          const senderIds = new Set();
-          if (selectedChat && selectedChat.isGroup) {
-            snapshot.forEach(doc => {
-              const msg = doc.data();
-              if (msg.senderId !== currentUser.uid && !msg.isSystem) {
-                senderIds.add(msg.senderId);
-              }
-            });
-          }
-          
-          const tempUserCache = {};
-          for (const id of senderIds) {
-            const userData = await getUserById(id);
-            if (userData) {
-              tempUserCache[id] = userData;
-            }
-          }
-          
-          snapshot.forEach(doc => {
-            const msg = doc.data();
-            const isMyMessage = msg.senderId === currentUser.uid;
-            const time = msg.timestamp ? new Date(msg.timestamp.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-            
-            if (msg.deletedFor) {
-              if (msg.deletedFor.includes('everyone') || 
-                  (msg.deletedFor && msg.deletedFor.includes(currentUser.uid))) {
-                return;
-              }
-            }
-            
-            if (msg.isSystem) {
-              html += `
-                <div class="message system">
-                  <div class="message-content">${msg.text}</div>
-                </div>
-              `;
-              return;
-            }
-            
-            let senderInfo = '';
-            if (selectedChat && selectedChat.isGroup && !isMyMessage) {
-              const sender = tempUserCache[msg.senderId];
-              if (sender) {
-                senderInfo = `<div class="message-sender">${sender.nickname} ${sender.tag}</div>`;
-              }
-            }
-            
-            const deleteOption = isMyMessage ? 
-              `<button class="message-delete-btn" onclick="showMessageOptions('${doc.id}', event)">⋯</button>` : '';
-            
-            html += `
-              <div class="message ${isMyMessage ? 'my-message' : 'other-message'}" id="msg-${doc.id}">
-                ${deleteOption}
-                ${senderInfo}
-                <div class="message-content">${msg.text}</div>
-                <div class="message-time">${time}</div>
-              </div>
-            `;
-          });
-          
-          messagesContainer.innerHTML = html;
-          messagesContainer.scrollTop = messagesContainer.scrollHeight;
-          
-        }, error => console.error('Ошибка загрузки сообщений:', error));
-    }
+        }
+        
+        // Кнопка удаления для своих сообщений
+        const deleteOption = isMyMessage ? 
+          `<button class="message-delete-btn" onclick="showMessageOptions('${doc.id}', event)">⋯</button>` : '';
+        
+        html += `
+          <div class="message ${isMyMessage ? 'my-message' : 'other-message'}" id="msg-${doc.id}" data-timestamp="${msg.timestamp?.seconds || 0}">
+            ${deleteOption}
+            ${senderInfo}
+            <div class="message-content">${msg.text.replace(/\n/g, '<br>')}</div>
+            <div class="message-time">${time}</div>
+          </div>
+        `;
+      });
+      
+      messagesContainer.innerHTML = html;
+      
+      // Плавная прокрутка вниз
+      setTimeout(() => {
+        messagesContainer.scrollTo({
+          top: messagesContainer.scrollHeight,
+          behavior: 'smooth'
+        });
+      }, 100);
+      
+    }, error => {
+      console.error('Ошибка загрузки сообщений:', error);
+      messagesContainer.innerHTML = '<div class="error">Ошибка загрузки сообщений</div>';
+    });
+}
 
     // ---------- Отправка сообщения ----------
     async function sendMessage() {
