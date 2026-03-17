@@ -1,11 +1,27 @@
 <script src="firebase-config.js"></script>
 <script>
-  // Кэш для данных пользователя
-  const userCache = new Map();
   let currentUser = null;
   let currentUserData = null;
   let unsubscribePosts = null;
-  let isSubmitting = false; // Флаг для блокировки повторных отправок
+  let isSubmitting = false;
+
+  // Показываем скелетоны сразу
+  function showSkeletons() {
+    document.getElementById('profileAvatar').innerHTML = '<div class="skeleton-circle"></div>';
+    document.getElementById('profileInfo').innerHTML = `
+      <div class="skeleton-line"></div>
+      <div class="skeleton-line"></div>
+      <div class="skeleton-line"></div>
+    `;
+    document.getElementById('postsContainer').innerHTML = `
+      <div class="skeleton-post"></div>
+      <div class="skeleton-post"></div>
+      <div class="skeleton-post"></div>
+    `;
+  }
+
+  // Показываем скелетоны при загрузке
+  showSkeletons();
 
   auth.onAuthStateChanged(async (user) => {
     if (!user || !user.emailVerified) {
@@ -16,24 +32,25 @@
     currentUser = user;
     
     try {
+      // Загружаем данные пользователя
       const userDoc = await db.collection('users').doc(user.uid).get();
       
       if (!userDoc.exists) {
-        window.location.reload();
+        console.error('Документ пользователя не найден');
         return;
       }
       
       currentUserData = userDoc.data();
-      userCache.set(user.uid, currentUserData);
       
       // Обновляем аватар
       document.getElementById('profileAvatar').innerHTML = 
         currentUserData.nickname ? currentUserData.nickname.charAt(0).toUpperCase() : '?';
       
+      // Загружаем информацию профиля
       loadProfileInfo();
       
-      // Запускаем ЕДИНСТВЕННЫЙ слушатель для всех постов
-      listenForPosts();
+      // Загружаем посты
+      loadPosts();
       
     } catch (error) {
       console.error('Ошибка загрузки профиля:', error);
@@ -64,64 +81,117 @@
     `;
   }
 
-  // ЕДИНСТВЕННЫЙ слушатель для постов
-  function listenForPosts() {
+  async function loadPosts() {
+    const postsContainer = document.getElementById('postsContainer');
+    
+    try {
+      const snapshot = await db.collection('posts')
+        .where('userId', '==', currentUser.uid)
+        .orderBy('createdAt', 'desc')
+        .get();
+      
+      if (snapshot.empty) {
+        postsContainer.innerHTML = '<div class="no-posts">У вас пока нет постов. Создайте первый!</div>';
+        return;
+      }
+      
+      let postsHTML = '';
+      
+      snapshot.forEach(doc => {
+        const post = doc.data();
+        let date = 'Только что';
+        if (post.createdAt) {
+          try {
+            const dateObj = post.createdAt.toDate();
+            date = dateObj.toLocaleString();
+          } catch (e) {
+            date = 'Только что';
+          }
+        }
+        
+        postsHTML += `
+          <div class="post-card" id="post-${doc.id}">
+            <div class="post-header">
+              <span class="post-date">${date}</span>
+              <button onclick="deletePost('${doc.id}')" class="delete-post-btn">×</button>
+            </div>
+            <div class="post-content">${post.content ? post.content.replace(/\n/g, '<br>') : ''}</div>
+          </div>
+        `;
+      });
+      
+      postsContainer.innerHTML = postsHTML;
+      
+      // Запускаем слушатель для новых постов
+      listenForNewPosts();
+      
+    } catch (error) {
+      console.error('Ошибка загрузки постов:', error);
+      postsContainer.innerHTML = '<div class="error">Ошибка загрузки постов</div>';
+    }
+  }
+
+  function listenForNewPosts() {
     if (unsubscribePosts) {
       unsubscribePosts();
     }
     
-    const postsContainer = document.getElementById('postsContainer');
-    
     unsubscribePosts = db.collection('posts')
       .where('userId', '==', currentUser.uid)
       .orderBy('createdAt', 'desc')
+      .limit(1)
       .onSnapshot(snapshot => {
-        if (snapshot.empty) {
-          postsContainer.innerHTML = '<div class="no-posts">У вас пока нет постов. Создайте первый!</div>';
-          return;
-        }
-        
-        let postsHTML = '';
-        
-        snapshot.forEach(doc => {
-          const post = doc.data();
-          let date = 'Только что';
-          if (post.createdAt) {
-            try {
-              date = new Date(post.createdAt.toDate()).toLocaleString();
-            } catch (e) {
-              date = 'Только что';
+        snapshot.docChanges().forEach(change => {
+          if (change.type === 'added') {
+            // Проверяем, есть ли уже такой пост
+            const existingPost = document.getElementById(`post-${change.doc.id}`);
+            if (!existingPost) {
+              // Добавляем новый пост в начало списка
+              const post = change.doc.data();
+              let date = 'Только что';
+              if (post.createdAt) {
+                try {
+                  const dateObj = post.createdAt.toDate();
+                  date = dateObj.toLocaleString();
+                } catch (e) {}
+              }
+              
+              const postsContainer = document.getElementById('postsContainer');
+              const noPostsMessage = postsContainer.querySelector('.no-posts');
+              
+              const newPostHTML = `
+                <div class="post-card" id="post-${change.doc.id}">
+                  <div class="post-header">
+                    <span class="post-date">${date}</span>
+                    <button onclick="deletePost('${change.doc.id}')" class="delete-post-btn">×</button>
+                  </div>
+                  <div class="post-content">${post.content ? post.content.replace(/\n/g, '<br>') : ''}</div>
+                </div>
+              `;
+              
+              if (noPostsMessage) {
+                // Если было сообщение "нет постов", заменяем его
+                postsContainer.innerHTML = newPostHTML;
+              } else {
+                // Иначе добавляем в начало
+                postsContainer.insertAdjacentHTML('afterbegin', newPostHTML);
+              }
+            }
+          } else if (change.type === 'removed') {
+            // Удаляем пост из списка
+            const postElement = document.getElementById(`post-${change.doc.id}`);
+            if (postElement) {
+              postElement.remove();
+              
+              // Если после удаления не осталось постов, показываем сообщение
+              if (document.getElementById('postsContainer').children.length === 0) {
+                document.getElementById('postsContainer').innerHTML = '<div class="no-posts">У вас пока нет постов. Создайте первый!</div>';
+              }
             }
           }
-          
-          postsHTML += `
-            <div class="post-card" id="post-${doc.id}">
-              <div class="post-header">
-                <span class="post-date">${date}</span>
-                <button onclick="deletePost('${doc.id}')" class="delete-post-btn">×</button>
-              </div>
-              <div class="post-content">${post.content ? post.content.replace(/\n/g, '<br>') : ''}</div>
-            </div>
-          `;
         });
-        
-        postsContainer.innerHTML = postsHTML;
-        
-        // Плавная прокрутка к новому посту
-        if (snapshot.docChanges().length > 0) {
-          const lastChange = snapshot.docChanges()[snapshot.docChanges().length - 1];
-          if (lastChange.type === 'added') {
-            setTimeout(() => {
-              const newPost = document.getElementById(`post-${lastChange.doc.id}`);
-              if (newPost) {
-                newPost.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-              }
-            }, 100);
-          }
-        }
       }, error => {
-        console.error('Ошибка загрузки постов:', error);
-        postsContainer.innerHTML = '<div class="error">Ошибка загрузки постов</div>';
+        console.error('Ошибка в слушателе постов:', error);
       });
   }
 
@@ -160,7 +230,6 @@
   }
 
   async function saveChanges() {
-    const user = auth.currentUser;
     const messageDiv = document.createElement('div');
     messageDiv.className = 'message';
     
@@ -169,14 +238,13 @@
     if (changes.tag) updates.tag = document.getElementById('editTag').value;
     
     try {
-      await db.collection('users').doc(user.uid).update(updates);
+      await db.collection('users').doc(currentUser.uid).update(updates);
       
       const newDisplayName = `${updates.nickname || currentUserData.nickname}|${updates.tag || currentUserData.tag}`;
-      await user.updateProfile({ displayName: newDisplayName });
+      await currentUser.updateProfile({ displayName: newDisplayName });
       
-      // Обновляем кэш
+      // Обновляем данные
       currentUserData = { ...currentUserData, ...updates };
-      userCache.set(user.uid, currentUserData);
       
       messageDiv.innerHTML = '<div class="success">Изменения сохранены!</div>';
       document.querySelector('.profile-left').appendChild(messageDiv);
@@ -204,7 +272,6 @@
   }
 
   async function createPost() {
-    // Блокируем повторные нажатия
     if (isSubmitting) return;
     
     const content = document.getElementById('postContent').value.trim();
@@ -214,10 +281,7 @@
       return;
     }
     
-    // Сразу закрываем модалку
     hideCreatePostModal();
-    
-    // Блокируем кнопку
     isSubmitting = true;
     
     try {
@@ -229,13 +293,10 @@
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
       
-      // Пост добавится автоматически через слушатель onSnapshot
-      
     } catch (error) {
       console.error('Ошибка создания поста:', error);
       alert('Ошибка при создании поста');
     } finally {
-      // Разблокируем кнопку
       isSubmitting = false;
     }
   }
@@ -245,7 +306,6 @@
     
     try {
       await db.collection('posts').doc(postId).delete();
-      // Пост удалится автоматически через слушатель onSnapshot
     } catch (error) {
       console.error('Ошибка удаления поста:', error);
       alert('Ошибка при удалении поста');
