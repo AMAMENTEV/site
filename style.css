@@ -2322,105 +2322,144 @@ body {
   animation: fadeIn 0.2s ease;
 }
 
-/* ========== ПРИНУДИТЕЛЬНОЕ ОТОБРАЖЕНИЕ СКРОЛЛБАРОВ НА МОБИЛЬНЫХ ========== */
+/* ========== СЕРО-НЕЗАМЕТНЫЕ СКРОЛЛБАРЫ (ВСЕГДА ВИДИМЫЕ) ========== */
 @media (max-width: 768px) {
-  /* Для списка чатов */
-  .chats-list {
-    overflow-y: scroll !important;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin !important; /* Для Firefox */
-    scrollbar-color: #3b82f6 #e2e8f0 !important; /* Для Firefox */
-  }
-  
-  
-  /* Для списка пользователей в модальных окнах */
+  /* Для всех прокручиваемых элементов */
+  .chats-list,
+  .messages-container,
   .users-checkbox-list,
-  .group-participants-list {
+  .group-participants-list,
+  .posts-container,
+  .chats-sidebar,
+  .users-list,
+  .profile-left,
+  .profile-right {
     overflow-y: scroll !important;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: thin !important;
-    scrollbar-color: #3b82f6 #e2e8f0 !important;
+    scrollbar-color: #cbd5e0 #f1f5f9 !important; /* Серый ползунок на светлом фоне */
   }
   
-  /* Стили для WebKit-браузеров (Chrome, Safari, Opera) */
-  .chats-list::-webkit-scrollbar,
-  .messages-container::-webkit-scrollbar,
-  .users-checkbox-list::-webkit-scrollbar,
-  .group-participants-list::-webkit-scrollbar {
-    width: 6px !important;
-    height: 6px !important;
-    background: transparent !important;
-    display: block !important; /* Принудительно показываем */
-  }
-  
-  .chats-list::-webkit-scrollbar-thumb,
-  .messages-container::-webkit-scrollbar-thumb,
-  .users-checkbox-list::-webkit-scrollbar-thumb,
-  .group-participants-list::-webkit-scrollbar-thumb {
-    background: #3b82f6 !important;
-    border-radius: 10px !important;
-    min-height: 40px !important;
-  }
-  
-  .chats-list::-webkit-scrollbar-track,
-  .messages-container::-webkit-scrollbar-track,
-  .users-checkbox-list::-webkit-scrollbar-track,
-  .group-participants-list::-webkit-scrollbar-track {
-    background: #e2e8f0 !important;
-    border-radius: 10px !important;
-  }
-  
-  /* Для списка постов в профиле */
-  .posts-container {
-    overflow-y: scroll !important;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin !important;
-    scrollbar-color: #3b82f6 #e2e8f0 !important;
-  }
-  
-  .posts-container::-webkit-scrollbar {
-    width: 6px !important;
-    background: transparent !important;
-    display: block !important;
-  }
-  
-  .posts-container::-webkit-scrollbar-thumb {
-    background: #3b82f6 !important;
-    border-radius: 10px !important;
-  }
-  
-  .posts-container::-webkit-scrollbar-track {
-    background: #e2e8f0 !important;
-    border-radius: 10px !important;
-  }
-}
-
-/* Для десктопа тоже сделаем красивые скроллбары */
-@media (min-width: 769px) {
+  /* WebKit-браузеры (Chrome, Safari, Opera) */
   .chats-list::-webkit-scrollbar,
   .messages-container::-webkit-scrollbar,
   .users-checkbox-list::-webkit-scrollbar,
   .group-participants-list::-webkit-scrollbar,
-  .posts-container::-webkit-scrollbar {
-    width: 8px;
-    background: transparent;
+  .posts-container::-webkit-scrollbar,
+  .chats-sidebar::-webkit-scrollbar,
+  .users-list::-webkit-scrollbar,
+  .profile-left::-webkit-scrollbar,
+  .profile-right::-webkit-scrollbar {
+    width: 6px !important;
+    height: 6px !important;
+    background: #f1f5f9 !important; /* Светло-серый фон */
+    display: block !important;
   }
   
   .chats-list::-webkit-scrollbar-thumb,
   .messages-container::-webkit-scrollbar-thumb,
   .users-checkbox-list::-webkit-scrollbar-thumb,
   .group-participants-list::-webkit-scrollbar-thumb,
-  .posts-container::-webkit-scrollbar-thumb {
-    background: #3b82f6;
-    border-radius: 10px;
+  .posts-container::-webkit-scrollbar-thumb,
+  .chats-sidebar::-webkit-scrollbar-thumb,
+  .users-list::-webkit-scrollbar-thumb,
+  .profile-left::-webkit-scrollbar-thumb,
+  .profile-right::-webkit-scrollbar-thumb {
+    background: #cbd5e0 !important; /* Серый ползунок */
+    border-radius: 10px !important;
+    min-height: 40px !important;
+  }
+  
+  .chats-list::-webkit-scrollbar-thumb:hover,
+  .messages-container::-webkit-scrollbar-thumb:hover,
+  .users-checkbox-list::-webkit-scrollbar-thumb:hover,
+  .group-participants-list::-webkit-scrollbar-thumb:hover,
+  .posts-container::-webkit-scrollbar-thumb:hover,
+  .chats-sidebar::-webkit-scrollbar-thumb:hover,
+  .users-list::-webkit-scrollbar-thumb:hover,
+  .profile-left::-webkit-scrollbar-thumb:hover,
+  .profile-right::-webkit-scrollbar-thumb:hover {
+    background: #a0aec0 !important; /* Чуть темнее при наведении */
   }
   
   .chats-list::-webkit-scrollbar-track,
   .messages-container::-webkit-scrollbar-track,
   .users-checkbox-list::-webkit-scrollbar-track,
   .group-participants-list::-webkit-scrollbar-track,
-  .posts-container::-webkit-scrollbar-track {
-    background: #e2e8f0;
+  .posts-container::-webkit-scrollbar-track,
+  .chats-sidebar::-webkit-scrollbar-track,
+  .users-list::-webkit-scrollbar-track,
+  .profile-left::-webkit-scrollbar-track,
+  .profile-right::-webkit-scrollbar-track {
+    background: #f1f5f9 !important;
+    border-radius: 10px !important;
+  }
+}
+
+/* Для десктопа тоже сделаем серые скроллбары */
+@media (min-width: 769px) {
+  .chats-list::-webkit-scrollbar,
+  .messages-container::-webkit-scrollbar,
+  .users-checkbox-list::-webkit-scrollbar,
+  .group-participants-list::-webkit-scrollbar,
+  .posts-container::-webkit-scrollbar,
+  .chats-sidebar::-webkit-scrollbar,
+  .users-list::-webkit-scrollbar,
+  .profile-left::-webkit-scrollbar,
+  .profile-right::-webkit-scrollbar {
+    width: 8px;
+    background: #f1f5f9;
+  }
+  
+  .chats-list::-webkit-scrollbar-thumb,
+  .messages-container::-webkit-scrollbar-thumb,
+  .users-checkbox-list::-webkit-scrollbar-thumb,
+  .group-participants-list::-webkit-scrollbar-thumb,
+  .posts-container::-webkit-scrollbar-thumb,
+  .chats-sidebar::-webkit-scrollbar-thumb,
+  .users-list::-webkit-scrollbar-thumb,
+  .profile-left::-webkit-scrollbar-thumb,
+  .profile-right::-webkit-scrollbar-thumb {
+    background: #cbd5e0;
     border-radius: 10px;
   }
+  
+  .chats-list::-webkit-scrollbar-thumb:hover,
+  .messages-container::-webkit-scrollbar-thumb:hover,
+  .users-checkbox-list::-webkit-scrollbar-thumb:hover,
+  .group-participants-list::-webkit-scrollbar-thumb:hover,
+  .posts-container::-webkit-scrollbar-thumb:hover,
+  .chats-sidebar::-webkit-scrollbar-thumb:hover,
+  .users-list::-webkit-scrollbar-thumb:hover,
+  .profile-left::-webkit-scrollbar-thumb:hover,
+  .profile-right::-webkit-scrollbar-thumb:hover {
+    background: #a0aec0;
+  }
+  
+  .chats-list::-webkit-scrollbar-track,
+  .messages-container::-webkit-scrollbar-track,
+  .users-checkbox-list::-webkit-scrollbar-track,
+  .group-participants-list::-webkit-scrollbar-track,
+  .posts-container::-webkit-scrollbar-track,
+  .chats-sidebar::-webkit-scrollbar-track,
+  .users-list::-webkit-scrollbar-track,
+  .profile-left::-webkit-scrollbar-track,
+  .profile-right::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 10px;
+  }
+}
+
+/* Убираем лишние скроллбары там где не надо */
+body {
+  overflow: hidden;
+}
+
+.messenger-container {
+  overflow: hidden;
+}
+
+/* Добавляем плавность */
+* {
+  scroll-behavior: smooth;
 }

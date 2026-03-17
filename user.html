@@ -169,5 +169,40 @@
       }
     }
   </script>
+<script>
+  // Гарантированно показываем серые скроллбары
+  function ensureScrollbars() {
+    const elements = document.querySelectorAll(
+      '.chats-list, .messages-container, .users-checkbox-list, ' +
+      '.group-participants-list, .posts-container, .chats-sidebar, ' +
+      '.users-list, .profile-left, .profile-right'
+    );
+    
+    elements.forEach(el => {
+      if (el) {
+        // Принудительно включаем скролл
+        el.style.overflowY = 'scroll';
+        // Убираем возможные стили, которые могли бы скрыть скролл
+        el.style.setProperty('overflow-y', 'scroll', 'important');
+      }
+    });
+  }
+  
+  // Запускаем после загрузки
+  window.addEventListener('load', ensureScrollbars);
+  window.addEventListener('resize', ensureScrollbars);
+  
+  // Следим за изменениями в DOM
+  const observer = new MutationObserver(ensureScrollbars);
+  observer.observe(document.body, { 
+    childList: true, 
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['style', 'class']
+  });
+  
+  // Запускаем сразу
+  ensureScrollbars();
+</script>
 </body>
 </html>
