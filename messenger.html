@@ -283,244 +283,146 @@
       }
     }
 
-    // ---------- ОПТИМИЗИРОВАННЫЙ слушатель чатов (быстрая загрузка) ----------
-function listenForChats() {
-  if (!currentUser) return;
-  
-  if (unsubscribeChats) {
-    unsubscribeChats();
-  }
-  
-  const chatsList = document.getElementById('chatsList');
-  
-  unsubscribeChats = db.collection('chats')
-    .where('participants', 'array-contains', currentUser.uid)
-    .onSnapshot(snapshot => {
+    // ---------- Слушатель чатов в реальном времени ----------
+    function listenForChats() {
+      if (!currentUser) return;
       
-      if (!chatsList) return;
-      
-      if (snapshot.empty) {
-        chatsList.innerHTML = '<div class="no-chats">У вас пока нет чатов. Найдите пользователя через поиск.</div>';
-        allChats = [];
-        return;
+      if (unsubscribeChats) {
+        unsubscribeChats();
       }
       
-      // Сначала показываем чаты с минимальной информацией
-      const quickChats = [];
-      const chatIds = [];
-      
-      snapshot.forEach(doc => {
-        const chat = doc.data();
-        chatIds.push(doc.id);
-        
-        let chatName = '';
-        let chatAvatar = '';
-        
-        if (chat.isGroup) {
-          chatName = chat.name || 'Беседа';
-          chatAvatar = '👥';
-        } else {
-          // Для личных чатов пока не знаем имя, покажем заглушку
-          chatName = 'Загрузка...';
-          chatAvatar = '?';
-        }
-        
-        quickChats.push({
-          id: doc.id,
-          ...chat,
-          displayName: chatName,
-          displayAvatar: chatAvatar,
-          lastMessage: chat.lastMessage || 'Нет сообщений',
-          lastMessageTime: chat.lastMessageTime ? chat.lastMessageTime.toDate?.() || new Date(chat.lastMessageTime) : new Date(chat.createdAt?.toDate?.() || 0),
-          createdAt: chat.createdAt ? chat.createdAt.toDate?.() || new Date(chat.createdAt) : new Date(),
-          isLoading: true // Флаг, что данные еще загружаются
-        });
-      });
-      
-      // Сортируем и показываем быстрый список
-      quickChats.sort((a, b) => {
-        const timeA = a.lastMessageTime || a.createdAt;
-        const timeB = b.lastMessageTime || b.createdAt;
-        return timeB - timeA;
-      });
-      
-      // Отображаем быстрый список с индикатором загрузки
-      displayChats(quickChats, true);
-      
-      // Теперь в фоне загружаем полные данные для всех чатов
-      loadFullChatData(chatIds);
-      
-    }, error => console.error('Ошибка прослушивания чатов:', error));
-}
-
-// ---------- Загрузка полных данных чатов в фоне ----------
-async function loadFullChatData(chatIds) {
-  if (!chatIds.length) return;
-  
-  try {
-    // 1. Получаем все ID пользователей из всех чатов
-    const allOtherUserIds = new Set();
-    const chatsData = {};
-    
-    // Сначала получим все чаты
-    for (const chatId of chatIds) {
-      const chatDoc = await db.collection('chats').doc(chatId).get();
-      const chat = chatDoc.data();
-      chatsData[chatId] = chat;
-      
-      if (!chat.isGroup) {
-        const otherUserId = chat.participants.find(id => id !== currentUser.uid);
-        if (otherUserId) allOtherUserIds.add(otherUserId);
-      }
-    }
-    
-    // 2. Загружаем ВСЕХ пользователей одним запросом (пачками по 10)
-    const userMap = new Map();
-    const userIds = Array.from(allOtherUserIds);
-    
-    for (let i = 0; i < userIds.length; i += 10) {
-      const batch = userIds.slice(i, i + 10);
-      const usersSnapshot = await db.collection('users')
-        .where('__name__', 'in', batch)
-        .get();
-      
-      usersSnapshot.forEach(doc => {
-        userMap.set(doc.id, doc.data());
-      });
-    }
-    
-    // 3. Загружаем последние сообщения для всех чатов (параллельно)
-    const lastMessagesPromises = chatIds.map(async (chatId) => {
-      const lastMsgQuery = await db.collection('chats').doc(chatId)
-        .collection('messages')
-        .orderBy('timestamp', 'desc')
-        .limit(5)
-        .get();
-      
-      let lastMessage = null;
-      let lastMessageTime = chatsData[chatId].lastMessageTime ? 
-        chatsData[chatId].lastMessageTime.toDate?.() || new Date(chatsData[chatId].lastMessageTime) : null;
-      
-      for (const msgDoc of lastMsgQuery.docs) {
-        const msg = msgDoc.data();
-        if (!msg.deletedFor || 
-            (!msg.deletedFor.includes('everyone') && !msg.deletedFor.includes(currentUser.uid))) {
-          lastMessage = msg.text;
-          lastMessageTime = msg.timestamp ? msg.timestamp.toDate?.() || new Date(msg.timestamp) : lastMessageTime;
-          break;
-        }
-      }
-      
-      return { chatId, lastMessage, lastMessageTime };
-    });
-    
-    const lastMessagesResults = await Promise.all(lastMessagesPromises);
-    const lastMessagesMap = {};
-    lastMessagesResults.forEach(result => {
-      lastMessagesMap[result.chatId] = {
-        lastMessage: result.lastMessage,
-        lastMessageTime: result.lastMessageTime
-      };
-    });
-    
-    // 4. Считаем непрочитанные для всех чатов (параллельно)
-    const unreadPromises = chatIds.map(async (chatId) => {
-      const chat = chatsData[chatId];
-      const unreadQuery = await db.collection('chats').doc(chatId)
-        .collection('messages')
-        .where('read', '==', false)
-        .get();
-      
-      let unreadCount = 0;
-      unreadQuery.forEach(msgDoc => {
-        const msg = msgDoc.data();
-        if (msg.deletedFor) {
-          if (msg.deletedFor.includes('everyone') || msg.deletedFor.includes(currentUser.uid)) {
+      unsubscribeChats = db.collection('chats')
+        .where('participants', 'array-contains', currentUser.uid)
+        .onSnapshot(snapshot => {
+          
+          const chatsList = document.getElementById('chatsList');
+          if (!chatsList) return;
+          
+          if (snapshot.empty) {
+            chatsList.innerHTML = '<div class="no-chats">У вас пока нет чатов. Найдите пользователя через поиск.</div>';
+            allChats = [];
             return;
           }
-        }
-        
-        if (chat.isGroup) {
-          if (msg.senderId !== currentUser.uid) {
-            unreadCount++;
-          }
-        } else {
-          if (msg.receiverId === currentUser.uid) {
-            unreadCount++;
-          }
-        }
-      });
-      
-      return { chatId, unreadCount };
-    });
-    
-    const unreadResults = await Promise.all(unreadPromises);
-    const newUnreadCounts = {};
-    unreadResults.forEach(result => {
-      newUnreadCounts[result.chatId] = result.unreadCount;
-    });
-    
-    // 5. Формируем финальный список чатов
-    const fullChats = [];
-    
-    chatIds.forEach(chatId => {
-      const chat = chatsData[chatId];
-      const lastMsgInfo = lastMessagesMap[chatId];
-      const unreadCount = newUnreadCounts[chatId] || 0;
-      
-      let chatName = '';
-      let chatAvatar = '';
-      let createdAt = chat.createdAt ? chat.createdAt.toDate?.() || new Date(chat.createdAt) : new Date();
-      
-      if (chat.isGroup) {
-        chatName = chat.name || 'Беседа';
-        chatAvatar = '👥';
-      } else {
-        const otherUserId = chat.participants.find(id => id !== currentUser.uid);
-        const otherUser = userMap.get(otherUserId);
-        chatName = otherUser ? otherUser.nickname : 'Пользователь';
-        chatAvatar = otherUser ? otherUser.tag : '';
-      }
-      
-      // Проверяем, есть ли сообщения в личном чате
-      if (!chat.isGroup && !lastMsgInfo.lastMessage) {
-        return; // Не добавляем пустые личные чаты
-      }
-      
-      fullChats.push({
-        id: chatId,
-        ...chat,
-        displayName: chatName,
-        displayAvatar: chatAvatar,
-        lastMessage: lastMsgInfo.lastMessage,
-        lastMessageTime: lastMsgInfo.lastMessageTime || createdAt,
-        createdAt: createdAt,
-        isLoading: false
-      });
-    });
-    
-    // Обновляем глобальные переменные
-    unreadCounts = newUnreadCounts;
-    allChats = fullChats;
-    
-    // Сортируем
-    allChats.sort((a, b) => {
-      const unreadA = unreadCounts[a.id] || 0;
-      const unreadB = unreadCounts[b.id] || 0;
-      if (unreadB !== unreadA) return unreadB - unreadA;
-      
-      const timeA = a.lastMessageTime || a.createdAt;
-      const timeB = b.lastMessageTime || b.createdAt;
-      return timeB - timeA;
-    });
-    
-    // Отображаем финальную версию
-    displayChats(allChats, false);
-    
-  } catch (error) {
-    console.error('Ошибка загрузки полных данных чатов:', error);
-  }
-}
+          
+          const chatPromises = [];
+          const chats = [];
+          const newUnreadCounts = {};
+          
+          snapshot.forEach(doc => {
+            const chat = doc.data();
+            
+            const promise = (async () => {
+              let chatName = '';
+              let chatAvatar = '';
+              let createdAt = chat.createdAt ? chat.createdAt.toDate?.() || new Date(chat.createdAt) : new Date();
+              
+              if (chat.isGroup) {
+                chatName = chat.name || 'Беседа';
+                chatAvatar = '👥';
+              } else {
+                const otherUserId = chat.participants.find(id => id !== currentUser.uid);
+                const otherUser = await getUserById(otherUserId);
+                chatName = otherUser ? otherUser.nickname : 'Пользователь';
+                chatAvatar = otherUser ? otherUser.tag : '';
+              }
+              
+              // Получаем последнее сообщение
+              const lastMsgQuery = await db.collection('chats').doc(doc.id)
+                .collection('messages')
+                .orderBy('timestamp', 'desc')
+                .limit(5)
+                .get();
+              
+              let lastMessage = null;
+              let lastMessageTime = chat.lastMessageTime ? chat.lastMessageTime.toDate?.() || new Date(chat.lastMessageTime) : null;
+              let hasAnyMessage = false;
+              
+              for (const msgDoc of lastMsgQuery.docs) {
+                const msg = msgDoc.data();
+                hasAnyMessage = true;
+                if (!msg.deletedFor || 
+                    (!msg.deletedFor.includes('everyone') && !msg.deletedFor.includes(currentUser.uid))) {
+                  lastMessage = msg.text;
+                  lastMessageTime = msg.timestamp ? msg.timestamp.toDate?.() || new Date(msg.timestamp) : lastMessageTime;
+                  break;
+                }
+              }
+              
+              // Для групповых чатов показываем всегда, для личных - только если есть сообщения
+              if (!chat.isGroup && !hasAnyMessage) {
+                return; // Не добавляем в список
+              }
+              
+              // Если нет сообщений, используем время создания чата для сортировки
+              if (!lastMessageTime) {
+                lastMessageTime = createdAt;
+              }
+              
+              // Считаем непрочитанные
+              const unreadQuery = await db.collection('chats').doc(doc.id)
+                .collection('messages')
+                .where('read', '==', false)
+                .get();
+              
+              let unreadCount = 0;
+              unreadQuery.forEach(msgDoc => {
+                const msg = msgDoc.data();
+                if (msg.deletedFor) {
+                  if (msg.deletedFor.includes('everyone') || msg.deletedFor.includes(currentUser.uid)) {
+                    return;
+                  }
+                }
+                
+                if (chat.isGroup) {
+                  if (msg.senderId !== currentUser.uid) {
+                    unreadCount++;
+                  }
+                } else {
+                  if (msg.receiverId === currentUser.uid) {
+                    unreadCount++;
+                  }
+                }
+              });
+              
+              newUnreadCounts[doc.id] = unreadCount;
+              
+              chats.push({
+                id: doc.id,
+                ...chat,
+                displayName: chatName,
+                displayAvatar: chatAvatar,
+                lastMessage: lastMessage,
+                lastMessageTime: lastMessageTime,
+                createdAt: createdAt // Добавляем дату создания для сортировки новых бесед
+              });
+            })();
+            
+            chatPromises.push(promise);
+          });
+          
+          Promise.all(chatPromises).then(() => {
+            // Фильтруем undefined (чаты без сообщений)
+            const filteredChats = chats.filter(chat => chat !== undefined);
+            
+            unreadCounts = newUnreadCounts;
+            allChats = filteredChats;
+            
+            // Сортировка: сначала непрочитанные, потом по времени последнего сообщения (или создания)
+            allChats.sort((a, b) => {
+              const unreadA = unreadCounts[a.id] || 0;
+              const unreadB = unreadCounts[b.id] || 0;
+              if (unreadB !== unreadA) return unreadB - unreadA;
+              
+              const timeA = a.lastMessageTime || a.createdAt || new Date(0);
+              const timeB = b.lastMessageTime || b.createdAt || new Date(0);
+              return timeB - timeA;
+            });
+            
+            displayChats(allChats);
+          });
+          
+        }, error => console.error('Ошибка прослушивания чатов:', error));
+    }
 
     async function getUserById(userId) {
       if (userCache.has(userId)) {
@@ -540,39 +442,35 @@ async function loadFullChatData(chatIds) {
       }
     }
 
-    // ---------- ОБНОВЛЕННАЯ функция отображения чатов ----------
-function displayChats(chats, showLoadingState = false) {
-  const chatsList = document.getElementById('chatsList');
-  
-  chatsList.innerHTML = chats.map(chat => {
-    const unreadCount = unreadCounts[chat.id] || 0;
-    const unreadBadge = unreadCount > 0 ? `<span class="unread-badge">${unreadCount}</span>` : '';
-    
-    let avatarContent = '';
-    if (chat.isGroup) {
-      avatarContent = '👥 ' + (chat.displayName && chat.displayName !== 'Загрузка...' ? chat.displayName.charAt(0).toUpperCase() : '?');
-    } else {
-      avatarContent = chat.displayName && chat.displayName !== 'Загрузка...' ? chat.displayName.charAt(0).toUpperCase() : '?';
+    function displayChats(chats) {
+      const chatsList = document.getElementById('chatsList');
+      
+      chatsList.innerHTML = chats.map(chat => {
+        const unreadCount = unreadCounts[chat.id] || 0;
+        const unreadBadge = unreadCount > 0 ? `<span class="unread-badge">${unreadCount}</span>` : '';
+        
+        let avatarContent = '';
+        if (chat.isGroup) {
+          avatarContent = '👥 ' + (chat.displayName ? chat.displayName.charAt(0).toUpperCase() : '?');
+        } else {
+          avatarContent = chat.displayName ? chat.displayName.charAt(0).toUpperCase() : '?';
+        }
+        
+        const lastMessage = chat.lastMessage || 'Нет сообщений';
+        
+        const chatJson = JSON.stringify(chat).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        
+        return `
+          <div class="chat-item ${unreadCount > 0 ? 'has-unread' : ''}" onclick='selectChat(${chatJson})'>
+            <div class="chat-avatar-placeholder">${avatarContent}</div>
+            <div class="chat-info">
+              <div class="chat-name">${chat.displayName} ${unreadBadge}</div>
+              <div class="chat-last-message">${lastMessage.length > 30 ? lastMessage.substring(0, 30) + '...' : lastMessage}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
     }
-    
-    const lastMessage = chat.isLoading ? 'Загрузка...' : (chat.lastMessage || 'Нет сообщений');
-    
-    const chatJson = JSON.stringify(chat).replace(/'/g, "\\'").replace(/"/g, '&quot;');
-    
-    // Добавляем класс для "загружающихся" чатов
-    const loadingClass = chat.isLoading ? ' chat-item-loading' : '';
-    
-    return `
-      <div class="chat-item ${unreadCount > 0 ? 'has-unread' : ''}${loadingClass}" onclick='selectChat(${chatJson})'>
-        <div class="chat-avatar-placeholder">${avatarContent}</div>
-        <div class="chat-info">
-          <div class="chat-name">${chat.displayName} ${unreadBadge}</div>
-          <div class="chat-last-message">${lastMessage.length > 30 ? lastMessage.substring(0, 30) + '...' : lastMessage}</div>
-        </div>
-      </div>
-    `;
-  }).join('');
-}
 
     // ---------- Поиск пользователей и бесед ----------
     function searchAll() {
