@@ -50,27 +50,7 @@
         -webkit-overflow-scrolling: touch;
       }
       
-      /* Делаем скроллбар всегда видимым в списке пользователей */
-      .users-checkbox-list {
-        overflow-y: scroll !important;
-        -webkit-overflow-scrolling: touch;
-        max-height: 300px;
-      }
       
-      /* Для WebKit-браузеров (Chrome, Safari) */
-      .users-checkbox-list::-webkit-scrollbar {
-        width: 8px;
-        background: transparent;
-      }
-      
-      .users-checkbox-list::-webkit-scrollbar-thumb {
-        background: rgba(0,0,0,0.3);
-        border-radius: 4px;
-      }
-      
-      .users-checkbox-list::-webkit-scrollbar-track {
-        background: rgba(0,0,0,0.05);
-      }
       
       .chat-area {
         height: 100%;
@@ -1386,37 +1366,31 @@ function exitChatMode() {
   <!-- Ваши существующие скрипты -->
   
   <script>
-    // Гарантированно показываем серые скроллбары
-    function ensureScrollbars() {
-      const elements = document.querySelectorAll(
-        '.chats-list, .messages-container, .users-checkbox-list, ' +
-        '.group-participants-list, .posts-container, .chats-sidebar, ' +
-        '.users-list, .profile-left, .profile-right'
-      );
-      
-      elements.forEach(el => {
-        if (el) {
+  // Минимальный скрипт для гарантии скроллбаров (без переопределений)
+  function ensureScrollbars() {
+    const elements = document.querySelectorAll(
+      '.chats-list, .messages-container, .users-checkbox-list, ' +
+      '.group-participants-list, .posts-container, .chats-sidebar, ' +
+      '.users-list, .profile-left, .profile-right'
+    );
+    
+    elements.forEach(el => {
+      if (el) {
+        // Только если стили не применились
+        if (window.getComputedStyle(el).overflowY !== 'scroll') {
           el.style.setProperty('overflow-y', 'scroll', 'important');
         }
-      });
-    }
-    
-    // Запускаем после загрузки
-    window.addEventListener('load', ensureScrollbars);
-    window.addEventListener('resize', ensureScrollbars);
-    
-    // Следим за изменениями в DOM
-    const observer = new MutationObserver(ensureScrollbars);
-    observer.observe(document.body, { 
-      childList: true, 
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['style', 'class']
+      }
     });
-    
-    // Запускаем сразу
-    ensureScrollbars();
-  </script>
+  }
+  
+  // Запускаем один раз после загрузки
+  window.addEventListener('load', ensureScrollbars);
+  
+  // Не используем MutationObserver, чтобы не создавать конфликтов
+  setTimeout(ensureScrollbars, 500);
+  setTimeout(ensureScrollbars, 1000);
+</script>
 </body>
 </html>
 
