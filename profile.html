@@ -74,6 +74,7 @@
     let currentUser = null;
     let currentUserData = null;
     let unsubscribePosts = null;
+    let isSubmitting = false; // Флаг для блокировки повторных нажатий
 
     // Функция для показа скелетонов
     function showSkeletons() {
@@ -326,40 +327,55 @@
     }
 
     async function createPost() {
-      const content = document.getElementById('postContent').value.trim();
-      
-      if (!content) {
-        alert('Введите текст поста');
-        return;
-      }
-      
-      try {
-        await db.collection('posts').add({
-          userId: currentUser.uid,
-          userNickname: currentUserData.nickname,
-          userTag: currentUserData.tag,
-          content: content,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        
-        hideCreatePostModal();
-        
-      } catch (error) {
-        console.error('Ошибка создания поста:', error);
-        alert('Ошибка при создании поста');
-      }
-    }
+  // Блокируем повторные нажатия
+  if (isSubmitting) return;
+  
+  const content = document.getElementById('postContent').value.trim();
+  
+  if (!content) {
+    alert('Введите текст поста');
+    return;
+  }
+  
+  // Скрываем модалку СРАЗУ
+  hideCreatePostModal();
+  
+  // Блокируем кнопку
+  isSubmitting = true;
+  
+  try {
+    await db.collection('posts').add({
+      userId: currentUser.uid,
+      userNickname: currentUserData.nickname,
+      userTag: currentUserData.tag,
+      content: content,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    
+    // Пост появится автоматически через слушатель listenForNewPosts()
+    
+  } catch (error) {
+    console.error('Ошибка создания поста:', error);
+    alert('Ошибка при создании поста');
+  } finally {
+    // Разблокируем кнопку через небольшую задержку
+    setTimeout(() => {
+      isSubmitting = false;
+    }, 1000);
+  }
+}
 
     async function deletePost(postId) {
-      if (!confirm('Удалить этот пост?')) return;
-      
-      try {
-        await db.collection('posts').doc(postId).delete();
-      } catch (error) {
-        console.error('Ошибка удаления поста:', error);
-        alert('Ошибка при удалении поста');
-      }
-    }
+  if (!confirm('Удалить этот пост?')) return;
+  
+  try {
+    await db.collection('posts').doc(postId).delete();
+    // Пост удалится автоматически через слушатель listenForNewPosts()
+  } catch (error) {
+    console.error('Ошибка удаления поста:', error);
+    alert('Ошибка при удалении поста');
+  }
+}
 
     function logout() {
       auth.signOut().then(() => window.location.href = 'index.html');
