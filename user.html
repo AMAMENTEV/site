@@ -169,34 +169,5 @@
       }
     }
   </script>
-  <!-- Ваши существующие скрипты -->
-  
-  <script>
-    // Гарантированно показываем серые скроллбары в профиле
-    function ensureProfileScrollbars() {
-      const elements = document.querySelectorAll(
-        '.posts-container, .profile-left, .profile-right'
-      );
-      
-      elements.forEach(el => {
-        if (el) {
-          el.style.setProperty('overflow-y', 'scroll', 'important');
-        }
-      });
-    }
-    
-    window.addEventListener('load', ensureProfileScrollbars);
-    window.addEventListener('resize', ensureProfileScrollbars);
-    
-    const observer = new MutationObserver(ensureProfileScrollbars);
-    observer.observe(document.body, { 
-      childList: true, 
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['style', 'class']
-    });
-    
-    ensureProfileScrollbars();
-  </script>
-</body>
+  </body>
 </html>
