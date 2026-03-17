@@ -79,13 +79,13 @@
         await user.sendEmailVerification();
         await auth.signOut();
         
-        messageDiv.innerHTML = `
-          <div class="success">
-            <h3>✅ Регистрация успешна!</h3>
-            <p>На почту ${email} отправлено письмо с подтверждением.</p>
-            <p><a href="index.html" style="color: #667eea;">Перейти ко входу →</a></p>
-          </div>
-        `;
+messageDiv.innerHTML = `
+  <div class="success">
+    <h3>✅ Регистрация успешна!</h3>
+    <p>На почту ${email} отправлено письмо с подтверждением.</p>
+    <p><a href="index.html" style="color: #667eea;">Перейти ко входу →</a></p>
+  </div>
+`;
         
         document.getElementById('registerForm').style.display = 'none';
         
