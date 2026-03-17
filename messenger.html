@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
   <title>Мессенджер</title>
+<!-- Для messenger.html -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💬</text></svg>">
   <link rel="stylesheet" href="style.css">
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
@@ -48,27 +50,7 @@
         -webkit-overflow-scrolling: touch;
       }
       
-      /* Делаем скроллбар всегда видимым в списке пользователей */
-      .users-checkbox-list {
-        overflow-y: scroll !important;
-        -webkit-overflow-scrolling: touch;
-        max-height: 300px;
-      }
       
-      /* Для WebKit-браузеров (Chrome, Safari) */
-      .users-checkbox-list::-webkit-scrollbar {
-        width: 8px;
-        background: transparent;
-      }
-      
-      .users-checkbox-list::-webkit-scrollbar-thumb {
-        background: rgba(0,0,0,0.3);
-        border-radius: 4px;
-      }
-      
-      .users-checkbox-list::-webkit-scrollbar-track {
-        background: rgba(0,0,0,0.05);
-      }
       
       .chat-area {
         height: 100%;
@@ -1381,5 +1363,6 @@ function exitChatMode() {
       }
     });
   </script>
-</body>
+  </body>
 </html>
+
