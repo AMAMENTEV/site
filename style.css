@@ -2404,15 +2404,55 @@ body {
   overflow: hidden;
 }
 
-/* ПРИНУДИТЕЛЬНО УБИРАЕМ ВСЕ ОТСТУПЫ МЕЖДУ КОЛОНКАМИ */
-.messenger-container > * {
-  margin: 0 !important;
+/* Исправление отступа из-за скроллбара */
+.chats-sidebar {
+  width: 320px;
+  margin-right: 0 !important;
+  padding-right: 0 !important;
+  box-sizing: border-box;
 }
 
+/* Чтобы скроллбар не создавал отступ */
+.chats-sidebar::-webkit-scrollbar {
+  width: 6px !important;
+  margin-left: -6px !important; /* Отрицательный margin компенсирует ширину скроллбара */
+}
+
+.chats-list {
+  padding-right: 10px; /* Компенсируем скроллбар */
+}
+
+/* Для Firefox */
 .chats-sidebar {
-  margin-right: 0 !important;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e0 #f1f5f9;
+}
+
+/* Убираем лишние скроллбары */
+.chats-sidebar {
+  overflow-y: scroll !important;
+  overflow-x: hidden !important;
+}
+
+.chats-sidebar::-webkit-scrollbar {
+  width: 6px !important;
+}
+
+/* Убираем возможный скроллбар у родительских элементов */
+.messenger-container {
+  overflow: hidden !important;
 }
 
 .chat-area {
-  margin-left: 0 !important;
+  overflow: hidden !important;
+}
+
+.messages-container {
+  overflow-y: scroll !important;
+  overflow-x: hidden !important;
+}
+
+/* Убеждаемся, что нет скроллбара у body или html */
+html, body {
+  overflow: hidden !important;
 }
