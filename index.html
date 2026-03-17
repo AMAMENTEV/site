@@ -67,10 +67,14 @@
       if (user.emailVerified) {
         window.location.href = 'messenger.html';
       } else {
+        // Показываем форму для повторной отправки письма
         messageDiv.innerHTML = `
           <div class="warning">
             <strong>ⓘ Аккаунт не активирован</strong>
             <p>На почту ${email} отправлено письмо с подтверждением.</p>
+            <div style="margin: 10px 0;">
+              <input type="password" id="resendPassword" placeholder="Введите пароль" style="width: 100%; padding: 8px; border: 1px solid #ffeeba; border-radius: 4px;">
+            </div>
             <button onclick="resendVerification('${email}')" class="resend-btn">Отправить снова</button>
           </div>
         `;
@@ -83,12 +87,16 @@
       
       if (error.code === 'auth/network-request-failed') {
         errorMessage = '🌐 Проблема с интернетом. Проверьте подключение и попробуйте снова.';
-      } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
-        errorMessage = '❌ Неверный email или пароль';
-      } else if (error.code === 'auth/too-many-requests') {
-        errorMessage = '⏳ Слишком много попыток. Попробуйте позже.';
+      } else if (error.code === 'auth/user-not-found') {
+        errorMessage = '❌ Аккаунт с таким email не существует';
+      } else if (error.code === 'auth/wrong-password') {
+        errorMessage = '❌ Неверный пароль';
       } else if (error.code === 'auth/invalid-email') {
         errorMessage = '📧 Некорректный формат email';
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = '⏳ Слишком много попыток. Попробуйте позже.';
+      } else if (error.code === 'auth/user-disabled') {
+        errorMessage = '🚫 Аккаунт заблокирован';
       } else {
         errorMessage = '❌ Ошибка при входе. Попробуйте позже.';
       }
@@ -102,18 +110,50 @@
 
   // Функция для повторной отправки письма подтверждения
   window.resendVerification = async (email) => {
+    const password = document.getElementById('resendPassword')?.value;
+    
+    if (!password) {
+      alert('Введите пароль');
+      return;
+    }
+    
+    const messageDiv = document.getElementById('message');
+    messageDiv.innerHTML = '<div class="loading">Отправка...</div>';
+    
     try {
-      await auth.sendSignInLinkToEmail(email, {
-        url: window.location.origin + '/login.html',
-        handleCodeInApp: true
-      });
-      document.getElementById('message').innerHTML = `
-        <div class="success">✅ Письмо отправлено повторно!</div>
+      // Входим снова
+      const userCredential = await auth.signInWithEmailAndPassword(email, password);
+      const user = userCredential.user;
+      
+      // Отправляем письмо подтверждения
+      await user.sendEmailVerification();
+      
+      // Выходим
+      await auth.signOut();
+      
+      messageDiv.innerHTML = `
+        <div class="success">
+          ✅ Письмо отправлено повторно на ${email}!<br>
+          <small>Проверьте папку "Спам"</small>
+        </div>
       `;
     } catch (error) {
-      document.getElementById('message').innerHTML = `
-        <div class="error">❌ Ошибка при отправке</div>
-      `;
+      console.error('Ошибка отправки:', error);
+      
+      let errorMessage = '';
+      if (error.code === 'auth/wrong-password') {
+        errorMessage = '❌ Неверный пароль';
+      } else if (error.code === 'auth/user-not-found') {
+        errorMessage = '❌ Аккаунт не существует';
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = '⏳ Слишком много попыток. Попробуйте позже.';
+      } else if (error.code === 'auth/network-request-failed') {
+        errorMessage = '🌐 Проблема с интернетом';
+      } else {
+        errorMessage = '❌ Ошибка при отправке. Попробуйте позже.';
+      }
+      
+      messageDiv.innerHTML = `<div class="error">${errorMessage}</div>`;
     }
   };
 </script>
