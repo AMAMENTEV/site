@@ -1363,34 +1363,6 @@ function exitChatMode() {
       }
     });
   </script>
-  <!-- Ваши существующие скрипты -->
-  
-  <script>
-  // Минимальный скрипт для гарантии скроллбаров (без переопределений)
-  function ensureScrollbars() {
-    const elements = document.querySelectorAll(
-      '.chats-list, .messages-container, .users-checkbox-list, ' +
-      '.group-participants-list, .posts-container, .chats-sidebar, ' +
-      '.users-list, .profile-left, .profile-right'
-    );
-    
-    elements.forEach(el => {
-      if (el) {
-        // Только если стили не применились
-        if (window.getComputedStyle(el).overflowY !== 'scroll') {
-          el.style.setProperty('overflow-y', 'scroll', 'important');
-        }
-      }
-    });
-  }
-  
-  // Запускаем один раз после загрузки
-  window.addEventListener('load', ensureScrollbars);
-  
-  // Не используем MutationObserver, чтобы не создавать конфликтов
-  setTimeout(ensureScrollbars, 500);
-  setTimeout(ensureScrollbars, 1000);
-</script>
-</body>
+  </body>
 </html>
 
