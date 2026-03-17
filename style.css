@@ -2321,3 +2321,16 @@ body {
 .message {
   animation: fadeIn 0.2s ease;
 }
+
+/* Стиль для загружающихся чатов */
+.chat-item-loading {
+  opacity: 0.7;
+}
+
+.chat-item-loading .chat-name {
+  color: #94a3b8;
+}
+
+.chat-item-loading .chat-last-message {
+  color: #cbd5e1;
+}
