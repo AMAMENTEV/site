@@ -213,6 +213,9 @@
       db.collection('chats')
         .where('participants', 'array-contains', currentUser.uid)
         .onSnapshot(snapshot => {
+db.collection('chats')
+  .where('participants', 'array-contains', currentUser.uid)
+  .onSnapshot({ includeMetadataChanges: true }, snapshot => {  // ← добавить эту опцию
           
           const chatsList = document.getElementById('chatsList');
           if (!chatsList) return;
@@ -606,35 +609,43 @@
     }
 
     // ---------- Отметить сообщения как прочитанные ----------
-    async function markMessagesAsRead(chatId) {
-      try {
-        const unreadSnapshot = await db.collection('chats').doc(chatId)
-          .collection('messages')
-          .where('read', '==', false)
-          .get();
-        
-        const batch = db.batch();
-        unreadSnapshot.forEach(doc => {
-          const msg = doc.data();
-          if (selectedChat.isGroup) {
-            if (msg.senderId !== currentUser.uid) {
-              batch.update(doc.ref, { read: true });
-            }
-          } else {
-            if (msg.receiverId === currentUser.uid) {
-              batch.update(doc.ref, { read: true });
-            }
-          }
-        });
-        
-        await batch.commit();
-        
-        unreadCounts[chatId] = 0;
-        
-      } catch (error) {
-        console.error('Ошибка при отметке сообщений как прочитанных:', error);
+async function markMessagesAsRead(chatId) {
+  try {
+    const unreadSnapshot = await db.collection('chats').doc(chatId)
+      .collection('messages')
+      .where('read', '==', false)
+      .get();
+    
+    if (unreadSnapshot.empty) return;
+    
+    const batch = db.batch();
+    unreadSnapshot.forEach(doc => {
+      const msg = doc.data();
+      
+      // В групповом чате помечаем все как прочитанные, если они не от текущего пользователя
+      if (selectedChat.isGroup) {
+        if (msg.senderId !== currentUser.uid) {
+          batch.update(doc.ref, { read: true });
+        }
+      } else {
+        // В личном - только те, которые адресованы текущему
+        if (msg.receiverId === currentUser.uid) {
+          batch.update(doc.ref, { read: true });
+        }
       }
-    }
+    });
+    
+    await batch.commit();
+    
+    // Обновляем счетчик в памяти
+    unreadCounts[chatId] = 0;
+    
+    // НЕ вызываем слушатель - изменения в Firestore сами обновят UI
+    
+  } catch (error) {
+    console.error('Ошибка при отметке сообщений как прочитанных:', error);
+  }
+}
 
     // ---------- Загрузка сообщений ----------
     function loadMessages() {
@@ -668,8 +679,12 @@
           });
           
           if (hasNewMessageFromOther) {
-            await batch.commit();
-          }
+  await batch.commit();
+  // Обновляем счетчик в памяти для текущего чата
+  if (currentChatId) {
+    unreadCounts[currentChatId] = 0;
+  }
+}
           
           let html = '';
           
