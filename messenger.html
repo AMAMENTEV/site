@@ -39,13 +39,35 @@
         left: 0;
         right: 0;
         bottom: 0;
-        padding-bottom: env(safe-area-inset-bottom, 0);
       }
       
       .chats-sidebar {
         height: 100%;
         padding-bottom: env(safe-area-inset-bottom, 20px);
         overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      
+      /* Делаем скроллбар всегда видимым в списке пользователей */
+      .users-checkbox-list {
+        overflow-y: scroll !important;
+        -webkit-overflow-scrolling: touch;
+        max-height: 300px;
+      }
+      
+      /* Для WebKit-браузеров (Chrome, Safari) */
+      .users-checkbox-list::-webkit-scrollbar {
+        width: 8px;
+        background: transparent;
+      }
+      
+      .users-checkbox-list::-webkit-scrollbar-thumb {
+        background: rgba(0,0,0,0.3);
+        border-radius: 4px;
+      }
+      
+      .users-checkbox-list::-webkit-scrollbar-track {
+        background: rgba(0,0,0,0.05);
       }
       
       .chat-area {
@@ -293,6 +315,7 @@
             const promise = (async () => {
               let chatName = '';
               let chatAvatar = '';
+              let createdAt = chat.createdAt ? chat.createdAt.toDate?.() || new Date(chat.createdAt) : new Date();
               
               if (chat.isGroup) {
                 chatName = chat.name || 'Беседа';
@@ -312,7 +335,7 @@
                 .get();
               
               let lastMessage = null;
-              let lastMessageTime = chat.lastMessageTime ? chat.lastMessageTime.toDate?.() || new Date(chat.lastMessageTime) : new Date(0);
+              let lastMessageTime = chat.lastMessageTime ? chat.lastMessageTime.toDate?.() || new Date(chat.lastMessageTime) : null;
               let hasAnyMessage = false;
               
               for (const msgDoc of lastMsgQuery.docs) {
@@ -326,9 +349,14 @@
                 }
               }
               
-              // Если нет ни одного сообщения, не показываем чат в списке
-              if (!hasAnyMessage && !chat.isGroup) {
+              // Для групповых чатов показываем всегда, для личных - только если есть сообщения
+              if (!chat.isGroup && !hasAnyMessage) {
                 return; // Не добавляем в список
+              }
+              
+              // Если нет сообщений, используем время создания чата для сортировки
+              if (!lastMessageTime) {
+                lastMessageTime = createdAt;
               }
               
               // Считаем непрочитанные
@@ -365,7 +393,8 @@
                 displayName: chatName,
                 displayAvatar: chatAvatar,
                 lastMessage: lastMessage,
-                lastMessageTime: lastMessageTime
+                lastMessageTime: lastMessageTime,
+                createdAt: createdAt // Добавляем дату создания для сортировки новых бесед
               });
             })();
             
@@ -373,22 +402,21 @@
           });
           
           Promise.all(chatPromises).then(() => {
-            // Фильтруем чаты без сообщений
-            const filteredChats = chats.filter(chat => {
-              // Групповые чаты показываем всегда
-              if (chat.isGroup) return true;
-              // Личные чаты показываем только если есть сообщения
-              return chat.lastMessage !== null;
-            });
+            // Фильтруем undefined (чаты без сообщений)
+            const filteredChats = chats.filter(chat => chat !== undefined);
             
             unreadCounts = newUnreadCounts;
             allChats = filteredChats;
             
+            // Сортировка: сначала непрочитанные, потом по времени последнего сообщения (или создания)
             allChats.sort((a, b) => {
               const unreadA = unreadCounts[a.id] || 0;
               const unreadB = unreadCounts[b.id] || 0;
               if (unreadB !== unreadA) return unreadB - unreadA;
-              return b.lastMessageTime - a.lastMessageTime;
+              
+              const timeA = a.lastMessageTime || a.createdAt || new Date(0);
+              const timeB = b.lastMessageTime || b.createdAt || new Date(0);
+              return timeB - timeA;
             });
             
             displayChats(allChats);
@@ -607,7 +635,8 @@
           };
           selectChat(chat);
         } else {
-          // Создаем чат, но он появится в списке только после первого сообщения
+          // Создаем чат, он появится в списке сразу (даже без сообщений) 
+          // благодаря использованию createdAt для сортировки
           const newChatRef = await db.collection('chats').add({
             participants: [currentUser.uid, userId],
             isGroup: false,
@@ -616,14 +645,13 @@
             lastMessageTime: null
           });
           
-          // Сразу открываем чат, но в списке он не появится
+          // Сразу открываем чат
           const chat = {
             id: newChatRef.id,
             participants: [currentUser.uid, userId],
             isGroup: false,
             displayName: nickname,
-            displayAvatar: tag,
-            lastMessageTime: new Date(0)
+            displayAvatar: tag
           };
           
           selectChat(chat);
@@ -913,7 +941,7 @@
         
         document.getElementById('groupName').value = '';
         
-        // Чат появится в слушателе автоматически
+        // Чат появится в слушателе автоматически и поднимется наверх
         
       } catch (error) {
         console.error('Ошибка создания беседы:', error);
