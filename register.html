@@ -30,6 +30,27 @@
     .tag-input-wrapper input {
       padding-left: 30px !important;
     }
+    
+    /* Индикатор проверки тега */
+    .tag-status {
+      font-size: 0.8rem;
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    
+    .tag-status.available {
+      color: #10b981;
+    }
+    
+    .tag-status.unavailable {
+      color: #ef4444;
+    }
+    
+    .tag-status.loading {
+      color: #6b7280;
+    }
   </style>
 </head>
 <body class="auth-page">
@@ -48,9 +69,10 @@
         <div class="tag-input-wrapper">
           <span>@</span>
           <input type="text" id="tag" placeholder="username" required 
-                 oninput="handleTagInput(this)" 
+                 oninput="handleTagInput(this); checkTagUnique(this)" 
                  onkeydown="preventAtSymbolDeletion(event, this)">
         </div>
+        <div id="tagStatus" class="tag-status"></div>
       </div>
       
       <div class="auth-input-group">
@@ -63,7 +85,7 @@
         <input type="password" id="password" placeholder="Минимум 6 символов" required minlength="6">
       </div>
       
-      <button type="submit" class="auth-button" id="registerBtn">Зарегистрироваться</button>
+      <button type="submit" class="auth-button" id="registerBtn" disabled>Зарегистрироваться</button>
     </form>
     
     <div class="auth-footer">
@@ -75,37 +97,121 @@
 
   <script src="firebase-config.js"></script>
   <script>
+    let tagCheckTimeout = null;
+    let isTagAvailable = false;
+    let currentTagValue = '';
+    
     // Функция для обработки ввода тега
     function handleTagInput(input) {
       let value = input.value;
       
-      // Удаляем все @ из значения (оставляем только то, что после @)
+      // Удаляем все @ из значения
       value = value.replace(/@/g, '');
       
-      // Обновляем значение без @
+      // Ограничиваем длину (например, максимум 20 символов)
+      if (value.length > 20) {
+        value = value.slice(0, 20);
+      }
+      
+      // Ограничиваем допустимые символы (только буквы, цифры и нижнее подчеркивание)
+      value = value.replace(/[^a-zA-Z0-9_]/g, '');
+      
       input.value = value;
     }
     
     // Функция для предотвращения удаления @
     function preventAtSymbolDeletion(event, input) {
-      // Если нажата backspace и курсор в самом начале
       if (event.key === 'Backspace' && input.selectionStart === 0 && input.selectionEnd === 0) {
         event.preventDefault();
       }
       
-      // Если нажата delete и выделен первый символ
       if (event.key === 'Delete' && input.selectionStart === 0 && input.selectionEnd === 1) {
         event.preventDefault();
       }
       
-      // Запрещаем перемещение курсора левее позиции 0
       if (event.key === 'ArrowLeft' && input.selectionStart === 0 && input.selectionEnd === 0) {
         event.preventDefault();
       }
     }
     
+    // Функция проверки уникальности тега
+    async function checkTagUnique(input) {
+      const tagValue = input.value.trim();
+      const tagStatus = document.getElementById('tagStatus');
+      const registerBtn = document.getElementById('registerBtn');
+      
+      // Если тег пустой или слишком короткий
+      if (!tagValue) {
+        tagStatus.innerHTML = '';
+        tagStatus.className = 'tag-status';
+        isTagAvailable = false;
+        registerBtn.disabled = true;
+        return;
+      }
+      
+      if (tagValue.length < 3) {
+        tagStatus.innerHTML = '⚠️ Минимум 3 символа';
+        tagStatus.className = 'tag-status unavailable';
+        isTagAvailable = false;
+        registerBtn.disabled = true;
+        return;
+      }
+      
+      // Показываем индикатор загрузки
+      tagStatus.innerHTML = '⏳ Проверка...';
+      tagStatus.className = 'tag-status loading';
+      
+      // Отменяем предыдущий таймаут
+      if (tagCheckTimeout) {
+        clearTimeout(tagCheckTimeout);
+      }
+      
+      // Запоминаем текущее значение
+      currentTagValue = tagValue;
+      
+      // Ждем пока пользователь перестанет печатать
+      tagCheckTimeout = setTimeout(async () => {
+        // Проверяем, не изменилось ли значение
+        if (currentTagValue !== tagValue) return;
+        
+        try {
+          // Ищем пользователя с таким тегом
+          const fullTag = '@' + tagValue;
+          const snapshot = await db.collection('users')
+            .where('tag', '==', fullTag)
+            .get();
+          
+          if (snapshot.empty) {
+            // Тег свободен
+            tagStatus.innerHTML = '✅ Тег доступен';
+            tagStatus.className = 'tag-status available';
+            isTagAvailable = true;
+            registerBtn.disabled = false;
+          } else {
+            // Тег занят
+            tagStatus.innerHTML = '❌ Этот тег уже занят';
+            tagStatus.className = 'tag-status unavailable';
+            isTagAvailable = false;
+            registerBtn.disabled = true;
+          }
+        } catch (error) {
+          console.error('Ошибка проверки тега:', error);
+          tagStatus.innerHTML = '❌ Ошибка проверки';
+          tagStatus.className = 'tag-status unavailable';
+          isTagAvailable = false;
+          registerBtn.disabled = true;
+        }
+      }, 500); // Задержка 500мс после последнего ввода
+    }
+    
     document.getElementById('registerForm').addEventListener('submit', async (e) => {
       e.preventDefault();
+      
+      // Финальная проверка уникальности перед отправкой
+      if (!isTagAvailable) {
+        alert('Пожалуйста, выберите другой тег');
+        return;
+      }
       
       const nickname = document.getElementById('nickname').value;
       let tag = document.getElementById('tag').value;
@@ -115,7 +221,7 @@
       const registerBtn = document.getElementById('registerBtn');
       const messageDiv = document.getElementById('message');
       
-      // Добавляем @ к тегу перед отправкой
+      // Добавляем @ к тегу
       tag = '@' + tag;
       
       registerBtn.disabled = true;
@@ -131,7 +237,7 @@
         
         await db.collection('users').doc(user.uid).set({
           nickname: nickname,
-          tag: tag, // Сохраняем тег уже с @
+          tag: tag,
           email: email,
           createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
