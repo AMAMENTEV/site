@@ -14,7 +14,17 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-// Включаем постоянное сохранение сессии
+// Включаем постоянное сохранение сессии ДАЖЕ ПОСЛЕ ЗАКРЫТИЯ БРАУЗЕРА
 auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL)
-  .then(() => console.log('✅ Сессия будет сохраняться'))
+  .then(() => console.log('✅ Сессия будет сохраняться постоянно'))
   .catch((error) => console.log('❌ Ошибка настройки сессии:', error));
+
+// Настройка Firestore для работы оффлайн (кеширование данных)
+db.enablePersistence()
+  .catch((err) => {
+    if (err.code === 'failed-precondition') {
+      console.log('⚠️ Несколько вкладок открыто, persistence работает в ограниченном режиме');
+    } else if (err.code === 'unimplemented') {
+      console.log('⚠️ Браузер не поддерживает persistence');
+    }
+  });
