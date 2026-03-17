@@ -750,7 +750,7 @@
       }
     }
 
-    // ---------- ОПТИМИЗИРОВАННАЯ загрузка сообщений ----------
+    // ---------- ОПТИМИЗИРОВАННАЯ загрузка сообщений (без лишней прокрутки) ----------
 function loadMessages() {
   if (!currentChatId) return;
   const messagesContainer = document.getElementById('messagesContainer');
@@ -775,13 +775,10 @@ function loadMessages() {
       
       // Собираем ID всех отправителей для группового чата (один раз)
       const senderIds = new Set();
-      const systemMessageIds = new Set();
       
       snapshot.forEach(doc => {
         const msg = doc.data();
-        if (msg.isSystem) {
-          systemMessageIds.add(doc.id);
-        } else if (selectedChat && selectedChat.isGroup && msg.senderId !== currentUser.uid) {
+        if (!msg.isSystem && selectedChat && selectedChat.isGroup && msg.senderId !== currentUser.uid) {
           senderIds.add(msg.senderId);
         }
       });
@@ -789,7 +786,6 @@ function loadMessages() {
       // Загружаем ВСЕХ отправителей одним запросом (для группового чата)
       const senderCache = {};
       if (senderIds.size > 0) {
-        // Загружаем пачкой по 10 пользователей (Firestore ограничение)
         const userIds = Array.from(senderIds);
         for (let i = 0; i < userIds.length; i += 10) {
           const batch = userIds.slice(i, i + 10);
@@ -822,9 +818,8 @@ function loadMessages() {
         unreadCounts[currentChatId] = 0;
       }
       
-      // Генерируем HTML (все данные уже загружены)
+      // Генерируем HTML
       let html = '';
-      let lastDate = '';
       
       snapshot.forEach(doc => {
         const msg = doc.data();
@@ -832,17 +827,9 @@ function loadMessages() {
         
         // Форматируем время
         let time = '';
-        let messageDate = '';
         if (msg.timestamp) {
           const date = msg.timestamp.toDate();
           time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          messageDate = date.toLocaleDateString();
-        }
-        
-        // Добавляем разделитель даты
-        if (messageDate && messageDate !== lastDate) {
-          html += `<div class="date-separator">${messageDate}</div>`;
-          lastDate = messageDate;
         }
         
         // Проверяем удаление
@@ -870,7 +857,6 @@ function loadMessages() {
           if (sender) {
             senderInfo = `<div class="message-sender">${sender.nickname || '?'} ${sender.tag || ''}</div>`;
           } else {
-            // Если не загрузился, показываем заглушку
             senderInfo = `<div class="message-sender">Пользователь</div>`;
           }
         }
@@ -880,7 +866,7 @@ function loadMessages() {
           `<button class="message-delete-btn" onclick="showMessageOptions('${doc.id}', event)">⋯</button>` : '';
         
         html += `
-          <div class="message ${isMyMessage ? 'my-message' : 'other-message'}" id="msg-${doc.id}" data-timestamp="${msg.timestamp?.seconds || 0}">
+          <div class="message ${isMyMessage ? 'my-message' : 'other-message'}" id="msg-${doc.id}">
             ${deleteOption}
             ${senderInfo}
             <div class="message-content">${msg.text.replace(/\n/g, '<br>')}</div>
@@ -891,13 +877,8 @@ function loadMessages() {
       
       messagesContainer.innerHTML = html;
       
-      // Плавная прокрутка вниз
-      setTimeout(() => {
-        messagesContainer.scrollTo({
-          top: messagesContainer.scrollHeight,
-          behavior: 'smooth'
-        });
-      }, 100);
+      // Мгновенная прокрутка вниз БЕЗ АНИМАЦИИ
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
       
     }, error => {
       console.error('Ошибка загрузки сообщений:', error);
