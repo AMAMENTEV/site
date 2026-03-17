@@ -242,6 +242,20 @@
                   `;
                   postsContainer.insertAdjacentHTML('afterbegin', newPostHTML);
                 }
+if (change.type === 'removed') {
+  // Удаляем пост из DOM
+  const postElement = document.getElementById(`post-${change.doc.id}`);
+  if (postElement) {
+    postElement.remove();
+    
+    // Если после удаления не осталось постов, показываем сообщение
+    const postsContainer = document.getElementById('postsContainer');
+    if (postsContainer.children.length === 0) {
+      postsContainer.innerHTML = '<div class="no-posts">У вас пока нет постов. Создайте первый!</div>';
+    }
+  }
+}
+
               });
             }
           }
