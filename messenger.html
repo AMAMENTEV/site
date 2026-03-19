@@ -706,41 +706,56 @@ function selectChat(chat) {
   }
 }
 
-     // ---------- Отметить сообщения как прочитанные ----------
-    async function markMessagesAsRead(chatId) {
-      try {
-        const unreadSnapshot = await db.collection('chats').doc(chatId)
-          .collection('messages')
-          .where('read', '==', false)
-          .get();
-        
-        if (unreadSnapshot.empty) return;
-        
-        const batch = db.batch();
-        unreadSnapshot.forEach(doc => {
-          const msg = doc.data();
-          
-          if (selectedChat && selectedChat.isGroup) {
-            if (msg.senderId !== currentUser.uid) {
-              batch.update(doc.ref, { read: true });
-            }
-          } else {
-            if (msg.receiverId === currentUser.uid) {
-              batch.update(doc.ref, { read: true });
-            }
-          }
-        });
-        
-        await batch.commit();
-        
-        unreadCounts[chatId] = 0;
-        
-	displayChats();
-        
-      } catch (error) {
-        console.error('Ошибка при отметке сообщений как прочитанных:', error);
+    // ---------- Отметить сообщения как прочитанные ----------
+async function markMessagesAsRead(chatId) {
+  try {
+    const unreadSnapshot = await db.collection('chats').doc(chatId)
+      .collection('messages')
+      .where('read', '==', false)
+      .get();
+    
+    if (unreadSnapshot.empty) return;
+    
+    const batch = db.batch();
+    unreadSnapshot.forEach(doc => {
+      const msg = doc.data();
+      
+      if (selectedChat && selectedChat.isGroup) {
+        if (msg.senderId !== currentUser.uid) {
+          batch.update(doc.ref, { read: true });
+        }
+      } else {
+        if (msg.receiverId === currentUser.uid) {
+          batch.update(doc.ref, { read: true });
+        }
+      }
+    });
+    
+    await batch.commit();
+    
+    // Обновляем счетчик в памяти
+    unreadCounts[chatId] = 0;
+    
+    // Находим элемент чата в DOM и обновляем только его
+    const chatElement = document.querySelector(`.chat-item[onclick*='${chatId}']`);
+    if (chatElement) {
+      // Убираем класс has-unread
+      chatElement.classList.remove('has-unread');
+      
+      // Убираем бейдж с непрочитанными
+      const nameElement = chatElement.querySelector('.chat-name');
+      if (nameElement) {
+        const badge = nameElement.querySelector('.unread-badge');
+        if (badge) {
+          badge.remove();
+        }
       }
     }
+    
+  } catch (error) {
+    console.error('Ошибка при отметке сообщений как прочитанных:', error);
+  }
+}
 
     // ---------- ОПТИМИЗИРОВАННАЯ загрузка сообщений (с защитой от гонки) ----------
 function loadMessages() {
@@ -831,9 +846,22 @@ function loadMessages() {
       });
       
       if (hasNewMessageFromOther) {
-        await batch.commit();
-        unreadCounts[currentChatId] = 0;
+  await batch.commit();
+  unreadCounts[currentChatId] = 0;
+  
+  // Обновляем только этот чат в списке
+  const chatElement = document.querySelector(`.chat-item[onclick*='${currentChatId}']`);
+  if (chatElement) {
+    chatElement.classList.remove('has-unread');
+    const nameElement = chatElement.querySelector('.chat-name');
+    if (nameElement) {
+      const badge = nameElement.querySelector('.unread-badge');
+      if (badge) {
+        badge.remove();
       }
+    }
+  }
+}
       
       // Генерируем HTML с датами
       let html = '';
