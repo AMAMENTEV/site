@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
+  <title>Настройки</title>
+<!-- Для settings.html -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚙️</text></svg>">
+  <link rel="stylesheet" href="style.css">
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+</head>
+<body class="settings-page">
+  <div class="settings-container">
+    <div class="settings-header">
+      <a href="messenger.html" class="back-btn"><</a>
+      <h1>Настройки</h1>
+      <div style="width: 52px;"></div>
+    </div>
+    
+    <div class="settings-content">
+      <div class="settings-section">
+        <h2>Тема оформления</h2>
+        <div class="theme-selector">
+          <div class="theme-option" onclick="setTheme('light')">
+            <div class="theme-preview light-preview"></div>
+            <span>Светлая</span>
+            <span class="theme-check" id="check-light">✓</span>
+          </div>
+          <div class="theme-option" onclick="setTheme('dark')">
+            <div class="theme-preview dark-preview"></div>
+            <span>Темная</span>
+            <span class="theme-check" id="check-dark">✓</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="settings-section">
+        <button onclick="logout()" class="settings-logout-btn">Выйти из аккаунта</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="firebase-config.js"></script>
+  <script>
+    let currentUser = null;
+    let currentUserData = null;
+
+    auth.onAuthStateChanged(async (user) => {
+      if (!user || !user.emailVerified) {
+        window.location.href = 'index.html';
+        return;
+      }
+      
+      currentUser = user;
+      
+      try {
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        if (userDoc.exists) {
+          currentUserData = userDoc.data();
+          
+          // Устанавливаем тему из настроек пользователя
+          if (currentUserData.theme) {
+            document.body.classList.add(`${currentUserData.theme}-theme`);
+            updateThemeCheck(currentUserData.theme);
+          }
+        }
+      } catch (error) {
+        console.error('Ошибка загрузки пользователя:', error);
+      }
+    });
+
+    function updateThemeCheck(theme) {
+      document.getElementById('check-light').style.opacity = theme === 'light' ? '1' : '0';
+      document.getElementById('check-dark').style.opacity = theme === 'dark' ? '1' : '0';
+    }
+
+    async function setTheme(theme) {
+      if (!currentUser) return;
+      
+      try {
+        await db.collection('users').doc(currentUser.uid).update({
+          theme: theme
+        });
+        
+        // Обновляем класс на body
+        document.body.classList.remove('light-theme', 'dark-theme');
+        document.body.classList.add(`${theme}-theme`);
+        
+        updateThemeCheck(theme);
+        
+      } catch (error) {
+        console.error('Ошибка сохранения темы:', error);
+      }
+    }
+
+    function logout() {
+      auth.signOut().then(() => window.location.href = 'index.html');
+    }
+  </script>
+</body>
+</html>

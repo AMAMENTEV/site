@@ -50,8 +50,6 @@
         -webkit-overflow-scrolling: touch;
       }
       
-      
-      
       .chat-area {
         height: 100%;
         padding-bottom: env(safe-area-inset-bottom, 0);
@@ -65,6 +63,61 @@
       .message-input-area {
         padding-bottom: max(12px, env(safe-area-inset-bottom, 12px));
       }
+      
+      /* Нижняя навигация для мобилок */
+      .mobile-nav-bar {
+        display: flex;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 70px;
+        background: var(--bg-primary);
+        border-top: 1px solid var(--border-color);
+        justify-content: space-around;
+        align-items: center;
+        padding: 0 10px;
+        padding-bottom: env(safe-area-inset-bottom, 0);
+        z-index: 1000;
+      }
+      
+      .mobile-nav-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        color: var(--text-secondary);
+        text-decoration: none;
+        font-size: 0.7rem;
+        padding: 8px;
+        border-radius: 12px;
+        transition: all 0.2s;
+        background: none;
+        border: none;
+        cursor: pointer;
+        width: 60px;
+      }
+      
+      .mobile-nav-item.active {
+        color: var(--accent-color);
+      }
+      
+      .mobile-nav-item span {
+        font-size: 1.3rem;
+      }
+      
+      .mobile-menu-btn {
+        display: none !important;
+      }
+      
+      .mobile-popup-menu {
+        display: none !important;
+      }
+      
+      .sidebar-overlay {
+        display: none !important;
+      }
     }
   </style>
 </head>
@@ -72,11 +125,32 @@
   <div class="messenger-container">
     <!-- Первая колонка - навигация (десктоп) -->
     <div class="nav-sidebar">
-      <h2>Меню</h2>
+      <div class="nav-header">
+        <h2>Меню</h2>
+      </div>
       <div class="nav-buttons">
-        <a href="profile.html" class="nav-button profile">Мой профиль</a>
-        <button onclick="showCreateGroupModal()" class="nav-button create-group">+ Беседа</button>
-        <button onclick="logout()" class="nav-button logout">Выйти</button>
+        <a href="profile.html" class="nav-button profile">
+          <span class="nav-icon">👤</span>
+          <span class="nav-text">Мой профиль</span>
+        </a>
+        <a href="messenger.html" class="nav-button messenger active">
+          <span class="nav-icon">💬</span>
+          <span class="nav-text">Мессенджер</span>
+        </a>
+        <a href="settings.html" class="nav-button settings">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-text">Настройки</span>
+        </a>
+        <button onclick="showCreateGroupModal()" class="nav-button create-group">
+          <span class="nav-icon">+</span>
+          <span class="nav-text">Новая беседа</span>
+        </button>
+      </div>
+      <div class="nav-footer">
+        <button onclick="logout()" class="nav-button logout">
+          <span class="nav-icon">🚪</span>
+          <span class="nav-text">Выйти</span>
+        </button>
       </div>
     </div>
 
@@ -110,13 +184,24 @@
     </div>
   </div>
 
-  <!-- Мобильное меню (бургер) -->
-  <button class="mobile-menu-btn" id="mobileMenuBtn" onclick="toggleMobileMenu()">☰</button>
-  <div class="sidebar-overlay" id="mobileMenuOverlay" onclick="toggleMobileMenu()"></div>
-  <div class="mobile-popup-menu" id="mobilePopupMenu">
-    <a href="profile.html" class="popup-item">Мой профиль</a>
-    <button onclick="showCreateGroupModal(); toggleMobileMenu()" class="popup-item">+ Беседа</button>
-    <button onclick="logout()" class="popup-item logout">Выйти</button>
+  <!-- Мобильная нижняя навигация -->
+  <div class="mobile-nav-bar">
+    <a href="profile.html" class="mobile-nav-item" id="mobile-profile">
+      <span>👤</span>
+      <span>Профиль</span>
+    </a>
+    <a href="messenger.html" class="mobile-nav-item active" id="mobile-messenger">
+      <span>💬</span>
+      <span>Чаты</span>
+    </a>
+    <a href="settings.html" class="mobile-nav-item" id="mobile-settings">
+      <span>⚙️</span>
+      <span>Настройки</span>
+    </a>
+    <button onclick="showCreateGroupModal()" class="mobile-nav-item" id="mobile-new-chat">
+      <span>+</span>
+      <span>Новый</span>
+    </button>
   </div>
 
   <!-- Модальное окно для создания беседы -->
@@ -209,7 +294,7 @@
     // Кэш пользователей для быстрого доступа
     const userCache = new Map();
 
-    // ---------- Проверка авторизации ----------
+    // ---------- Проверка авторизации и загрузка темы ----------
     auth.onAuthStateChanged(async (user) => {
       console.log('Auth state changed:', user ? user.email : 'no user');
       if (!user || !user.emailVerified) {
@@ -222,6 +307,13 @@
         const userDoc = await db.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
           currentUserData = userDoc.data();
+          
+          // Устанавливаем тему пользователя
+          if (currentUserData.theme) {
+            document.body.classList.add(`${currentUserData.theme}-theme`);
+          } else {
+            document.body.classList.add('light-theme'); // по умолчанию
+          }
         }
       } catch (error) {
         console.error('Ошибка загрузки пользователя:', error);
@@ -964,25 +1056,9 @@ function listenForNewMessages() {
     unsubscribeMessages();
   }
   
-  // Получаем время последнего загруженного сообщения
-  const messagesContainer = document.getElementById('messagesContainer');
-  const lastMessageElement = messagesContainer.lastElementChild;
-  
-  let lastTimestamp = null;
-  
-  // Ищем последнее сообщение с id
-  const messageElements = messagesContainer.querySelectorAll('[id^="msg-"]');
-  if (messageElements.length > 0) {
-    const lastMsgId = messageElements[messageElements.length - 1].id.replace('msg-', '');
-    // В реальности нужно получить timestamp из данных, но для простоты
-    // будем слушать все новые сообщения после текущего времени
-    lastTimestamp = firebase.firestore.Timestamp.now();
-  }
-  
   // Слушаем только новые сообщения
   unsubscribeMessages = db.collection('chats').doc(currentChatId)
     .collection('messages')
-    .where('timestamp', '>', lastTimestamp || firebase.firestore.Timestamp.now())
     .orderBy('timestamp', 'asc')
     .onSnapshot(async snapshot => {
       
@@ -1078,8 +1154,6 @@ async function sendMessage() {
       lastMessageTime: firebase.firestore.FieldValue.serverTimestamp()
     });
     
-    // НЕ НУЖНО вызывать listenForChats() - слушатель сам обновит
-    
   } catch (error) {
     console.error('Ошибка отправки:', error);
     alert('Ошибка при отправке сообщения');
@@ -1137,8 +1211,6 @@ async function sendMessage() {
         
         document.getElementById('groupName').value = '';
         
-        // Чат появится в слушателе автоматически и поднимется наверх
-        
       } catch (error) {
         console.error('Ошибка создания беседы:', error);
         alert('Ошибка при создании беседы: ' + error.message);
@@ -1154,18 +1226,15 @@ async function openChatInfo(chatId) {
   if (!selectedChat || !selectedChat.isGroup) return;
   
   try {
-    // Всегда получаем свежие данные из базы
     const chatDoc = await db.collection('chats').doc(chatId).get();
     const chat = chatDoc.data();
     
-    // Обновляем selectedChat в памяти
     selectedChat = {
       ...selectedChat,
       participants: chat.participants,
       name: chat.name
     };
     
-    // Собираем информацию об участниках
     let participantsHTML = '<ul class="participants-list">';
     for (const userId of chat.participants) {
       const userData = await getUserById(userId);
@@ -1183,19 +1252,16 @@ async function openChatInfo(chatId) {
     document.getElementById('groupInfoName').textContent = chat.name || 'Беседа';
     document.getElementById('groupParticipants').innerHTML = participantsHTML;
     
-    // Показываем/скрываем кнопку выхода
     const leaveBtn = document.getElementById('leaveGroupBtn');
     if (chat.createdBy === currentUser.uid) {
-      leaveBtn.style.display = 'none'; // Создатель не может выйти, только удалить
+      leaveBtn.style.display = 'none';
     } else {
       leaveBtn.style.display = 'block';
     }
     
-    // Очищаем поле поиска и список добавления
     document.getElementById('searchUsersToAdd').value = '';
     document.getElementById('addParticipantsList').innerHTML = '<div class="no-users">Начните вводить имя для поиска</div>';
     
-    // Показываем кнопку удаления только создателю
     const deleteBtn = document.getElementById('deleteGroupBtn');
     if (chat.createdBy === currentUser.uid) {
       deleteBtn.style.display = 'inline-block';
@@ -1227,12 +1293,10 @@ function updateChatHeaderParticipantCount() {
   if (!confirm('Удалить этого участника из беседы?')) return;
   
   try {
-    // Удаляем участника
     await db.collection('chats').doc(selectedChat.id).update({
       participants: firebase.firestore.FieldValue.arrayRemove(userId)
     });
     
-    // Отправляем системное сообщение
     const userData = await getUserById(userId);
     if (userData) {
       await db.collection('chats').doc(selectedChat.id)
@@ -1246,23 +1310,17 @@ function updateChatHeaderParticipantCount() {
         });
     }
     
-    // Получаем обновленные данные чата
     const updatedChatDoc = await db.collection('chats').doc(selectedChat.id).get();
     const updatedChat = updatedChatDoc.data();
     
-    // Обновляем selectedChat в памяти
     selectedChat = {
       ...selectedChat,
       participants: updatedChat.participants
     };
     
-    // Обновляем информацию в модалке
     await openChatInfo(selectedChat.id);
-    
-    // Обновляем количество участников в шапке
     updateChatHeaderParticipantCount();
     
-    // Обновляем список чатов (чтобы беседа поднялась вверх)
     if (unsubscribeChats) {
       unsubscribeChats();
     }
@@ -1287,12 +1345,10 @@ function updateChatHeaderParticipantCount() {
   checkboxes.forEach(cb => newParticipants.push(cb.value));
   
   try {
-    // Добавляем новых участников
     await db.collection('chats').doc(selectedChat.id).update({
       participants: firebase.firestore.FieldValue.arrayUnion(...newParticipants)
     });
     
-    // Отправляем системное сообщение о добавлении
     const addedNames = [];
     for (const userId of newParticipants) {
       const userData = await getUserById(userId);
@@ -1311,23 +1367,17 @@ function updateChatHeaderParticipantCount() {
         isSystem: true
       });
     
-    // Получаем обновленные данные чата
     const updatedChatDoc = await db.collection('chats').doc(selectedChat.id).get();
     const updatedChat = updatedChatDoc.data();
     
-    // Обновляем selectedChat в памяти
     selectedChat = {
       ...selectedChat,
       participants: updatedChat.participants
     };
     
-    // Обновляем информацию в модалке
     await openChatInfo(selectedChat.id);
-    
-    // Обновляем количество участников в шапке
     updateChatHeaderParticipantCount();
     
-    // Обновляем список чатов (чтобы беседа поднялась вверх)
     if (unsubscribeChats) {
       unsubscribeChats();
     }
@@ -1466,7 +1516,12 @@ function updateChatHeaderParticipantCount() {
     function enterChatMode() {
       isChatMode = true;
       document.body.classList.add('chat-mode');
-      document.getElementById('mobileMenuBtn').style.display = 'none';
+      
+      // Скрываем нижнюю навигацию
+      const mobileNav = document.querySelector('.mobile-nav-bar');
+      if (mobileNav) {
+        mobileNav.style.display = 'none';
+      }
       
       const chatsSidebar = document.getElementById('chatsSidebar');
       if (chatsSidebar) {
@@ -1480,20 +1535,23 @@ function updateChatHeaderParticipantCount() {
 function exitChatMode() {
   isChatMode = false;
   document.body.classList.remove('chat-mode');
-  document.getElementById('mobileMenuBtn').style.display = 'flex';
+  
+  // Показываем нижнюю навигацию
+  const mobileNav = document.querySelector('.mobile-nav-bar');
+  if (mobileNav) {
+    mobileNav.style.display = 'flex';
+  }
   
   const chatsSidebar = document.getElementById('chatsSidebar');
   if (chatsSidebar) {
     chatsSidebar.style.display = 'flex';
   }
 
-  // Отписываемся от сообщений
   if (unsubscribeMessages) {
     unsubscribeMessages();
     unsubscribeMessages = null;
   }
   
-  // Очищаем всё
   selectedChat = null;
   currentChatId = null;
   document.getElementById('chatHeader').innerHTML = '<div class="no-chat-selected">Выберите чат для начала общения</div>';
@@ -1512,14 +1570,6 @@ function exitChatMode() {
       window.location.href = `user.html?id=${userId}`;
     }
 
-    // ---------- Мобильное меню (бургер) ----------
-    function toggleMobileMenu() {
-      const menu = document.getElementById('mobilePopupMenu');
-      const overlay = document.getElementById('mobileMenuOverlay');
-      menu.classList.toggle('active');
-      overlay.classList.toggle('active');
-    }
-
     function logout() {
       auth.signOut().then(() => window.location.href = 'index.html');
     }
@@ -1528,7 +1578,6 @@ function exitChatMode() {
     window.addEventListener('load', function() {
       if (window.innerWidth <= 768) {
         document.body.classList.remove('chat-mode');
-        document.getElementById('mobileMenuBtn').style.display = 'flex';
         document.getElementById('messageInputArea').style.display = 'none';
         
         const chatsSidebar = document.getElementById('chatsSidebar');
@@ -1541,13 +1590,22 @@ function exitChatMode() {
     window.addEventListener('resize', function() {
       if (window.innerWidth > 768) {
         document.body.classList.remove('chat-mode');
-        document.getElementById('mobileMenuBtn').style.display = 'none';
+        
+        const mobileNav = document.querySelector('.mobile-nav-bar');
+        if (mobileNav) {
+          mobileNav.style.display = 'none';
+        }
         
         const chatsSidebar = document.getElementById('chatsSidebar');
         if (chatsSidebar) {
           chatsSidebar.style.display = 'flex';
         }
       } else {
+        const mobileNav = document.querySelector('.mobile-nav-bar');
+        if (mobileNav) {
+          mobileNav.style.display = 'flex';
+        }
+        
         document.getElementById('mobileMenuBtn').style.display = isChatMode ? 'none' : 'flex';
         
         const chatsSidebar = document.getElementById('chatsSidebar');
