@@ -108,7 +108,7 @@
       // Удаляем все @ из значения
       value = value.replace(/@/g, '');
       
-      // Ограничиваем длину (например, максимум 20 символов)
+      // Ограничиваем длину (максимум 20 символов)
       if (value.length > 20) {
         value = value.slice(0, 20);
       }
@@ -201,7 +201,7 @@
           isTagAvailable = false;
           registerBtn.disabled = true;
         }
-      }, 500); // Задержка 500мс после последнего ввода
+      }, 500);
     }
     
     document.getElementById('registerForm').addEventListener('submit', async (e) => {
@@ -221,34 +221,36 @@
       const registerBtn = document.getElementById('registerBtn');
       const messageDiv = document.getElementById('message');
       
-      // Добавляем @ к тегу
+      // Добавляем @ к тегу для проверки
       tag = '@' + tag;
       
       registerBtn.disabled = true;
       registerBtn.textContent = 'Регистрация...';
       
       try {
+        // Создаем пользователя в Authentication
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
         const user = userCredential.user;
         
+        // Обновляем displayName (сохраняем ник и тег в профиле)
         await user.updateProfile({
           displayName: nickname + '|' + tag
         });
         
-        await db.collection('users').doc(user.uid).set({
-          nickname: nickname,
-          tag: tag,
-          email: email,
-          createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        // Отправляем письмо с подтверждением
+        await user.sendEmailVerification({
+          url: window.location.origin + '/login.html'
         });
         
-        await user.sendEmailVerification();
+        // Выходим из аккаунта (пользователь должен подтвердить email)
         await auth.signOut();
         
         messageDiv.innerHTML = `
           <div class="success">
             <h3>✅ Регистрация успешна!</h3>
             <p>На почту ${email} отправлено письмо с подтверждением.</p>
+            <p><strong>Важно:</strong> Данные будут сохранены только после подтверждения email.</p>
+            <p>Если вы не подтвердите email в течение часа, аккаунт будет автоматически удален.</p>
             <p><a href="index.html" style="color: #667eea;">Перейти ко входу →</a></p>
           </div>
         `;
