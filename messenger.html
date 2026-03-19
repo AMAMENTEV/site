@@ -1023,127 +1023,184 @@ function loadMessages() {
     }
 
     // ---------- Информация о групповом чате ----------
-    async function openChatInfo(chatId) {
-      if (!selectedChat || !selectedChat.isGroup) return;
-      
-      try {
-        const chatDoc = await db.collection('chats').doc(chatId).get();
-        const chat = chatDoc.data();
-        
-        let participantsHTML = '<ul class="participants-list">';
-        for (const userId of chat.participants) {
-          const userData = await getUserById(userId);
-          if (userData) {
-            const isCreator = userId === chat.createdBy ? ' (создатель)' : '';
-            const canRemove = userId !== currentUser.uid && userId !== chat.createdBy;
-            participantsHTML += `<li>
-              ${userData.nickname} ${userData.tag}${isCreator}
-              ${canRemove ? `<button class="remove-participant-btn" onclick="removeParticipant('${userId}')">×</button>` : ''}
-            </li>`;
-          }
-        }
-        participantsHTML += '</ul>';
-        
-        document.getElementById('groupInfoName').textContent = chat.name || 'Беседа';
-        document.getElementById('groupParticipants').innerHTML = participantsHTML;
-        
-        const leaveBtn = document.getElementById('leaveGroupBtn');
-        if (chat.createdBy === currentUser.uid) {
-          leaveBtn.style.display = 'none';
-        } else {
-          leaveBtn.style.display = 'block';
-        }
-        
-        document.getElementById('searchUsersToAdd').value = '';
-        document.getElementById('addParticipantsList').innerHTML = '<div class="no-users">Начните вводить имя для поиска</div>';
-        
-        const deleteBtn = document.getElementById('deleteGroupBtn');
-        if (chat.createdBy === currentUser.uid) {
-          deleteBtn.style.display = 'inline-block';
-        } else {
-          deleteBtn.style.display = 'none';
-        }
-        
-        document.getElementById('groupInfoModal').style.display = 'flex';
-        
-      } catch (error) {
-        console.error('Ошибка загрузки информации о беседе:', error);
+async function openChatInfo(chatId) {
+  if (!selectedChat || !selectedChat.isGroup) return;
+  
+  try {
+    // Всегда получаем свежие данные из базы
+    const chatDoc = await db.collection('chats').doc(chatId).get();
+    const chat = chatDoc.data();
+    
+    // Обновляем selectedChat в памяти
+    selectedChat = {
+      ...selectedChat,
+      participants: chat.participants,
+      name: chat.name
+    };
+    
+    // Собираем информацию об участниках
+    let participantsHTML = '<ul class="participants-list">';
+    for (const userId of chat.participants) {
+      const userData = await getUserById(userId);
+      if (userData) {
+        const isCreator = userId === chat.createdBy ? ' (создатель)' : '';
+        const canRemove = userId !== currentUser.uid && userId !== chat.createdBy;
+        participantsHTML += `<li>
+          ${userData.nickname} ${userData.tag}${isCreator}
+          ${canRemove ? `<button class="remove-participant-btn" onclick="removeParticipant('${userId}')">×</button>` : ''}
+        </li>`;
       }
     }
+    participantsHTML += '</ul>';
+    
+    document.getElementById('groupInfoName').textContent = chat.name || 'Беседа';
+    document.getElementById('groupParticipants').innerHTML = participantsHTML;
+    
+    // Показываем/скрываем кнопку выхода
+    const leaveBtn = document.getElementById('leaveGroupBtn');
+    if (chat.createdBy === currentUser.uid) {
+      leaveBtn.style.display = 'none'; // Создатель не может выйти, только удалить
+    } else {
+      leaveBtn.style.display = 'block';
+    }
+    
+    // Очищаем поле поиска и список добавления
+    document.getElementById('searchUsersToAdd').value = '';
+    document.getElementById('addParticipantsList').innerHTML = '<div class="no-users">Начните вводить имя для поиска</div>';
+    
+    // Показываем кнопку удаления только создателю
+    const deleteBtn = document.getElementById('deleteGroupBtn');
+    if (chat.createdBy === currentUser.uid) {
+      deleteBtn.style.display = 'inline-block';
+    } else {
+      deleteBtn.style.display = 'none';
+    }
+    
+    document.getElementById('groupInfoModal').style.display = 'flex';
+    
+  } catch (error) {
+    console.error('Ошибка загрузки информации о беседе:', error);
+  }
+}
 
-    async function removeParticipant(userId) {
-      if (!selectedChat || !selectedChat.isGroup) return;
-      
-      if (!confirm('Удалить этого участника из беседы?')) return;
-      
-      try {
-        await db.collection('chats').doc(selectedChat.id).update({
-          participants: firebase.firestore.FieldValue.arrayRemove(userId)
-        });
-        
-        const userData = await getUserById(userId);
-        if (userData) {
-          await db.collection('chats').doc(selectedChat.id)
-            .collection('messages')
-            .add({
-              text: `❌ ${userData.nickname} ${userData.tag} удален из беседы`,
-              senderId: 'system',
-              timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-              read: false,
-              isSystem: true
-            });
-        }
-        
-        openChatInfo(selectedChat.id);
-        
-      } catch (error) {
-        console.error('Ошибка удаления участника:', error);
-        alert('Ошибка при удалении участника');
-      }
+// ---------- Обновление количества участников в шапке чата ----------
+function updateChatHeaderParticipantCount() {
+  if (selectedChat && selectedChat.isGroup) {
+    const participantCount = selectedChat.participants ? selectedChat.participants.length : 2;
+    const participantElement = document.querySelector('.selected-chat p');
+    if (participantElement) {
+      participantElement.textContent = `${participantCount} участников`;
     }
+  }
+}
 
-    async function addSelectedParticipants() {
-      if (!selectedChat) return;
-      
-      const checkboxes = document.querySelectorAll('#addParticipantsList input[type="checkbox"]:checked');
-      if (checkboxes.length === 0) {
-        alert('Выберите пользователей для добавления');
-        return;
-      }
-      
-      const newParticipants = [];
-      checkboxes.forEach(cb => newParticipants.push(cb.value));
-      
-      try {
-        await db.collection('chats').doc(selectedChat.id).update({
-          participants: firebase.firestore.FieldValue.arrayUnion(...newParticipants)
+    // ---------- Удаление участника из беседы ----------
+async function removeParticipant(userId) {
+  if (!selectedChat || !selectedChat.isGroup) return;
+  
+  if (!confirm('Удалить этого участника из беседы?')) return;
+  
+  try {
+    // Удаляем участника
+    await db.collection('chats').doc(selectedChat.id).update({
+      participants: firebase.firestore.FieldValue.arrayRemove(userId)
+    });
+    
+    // Отправляем системное сообщение
+    const userData = await getUserById(userId);
+    if (userData) {
+      await db.collection('chats').doc(selectedChat.id)
+        .collection('messages')
+        .add({
+          text: `❌ ${userData.nickname} ${userData.tag} удален из беседы`,
+          senderId: 'system',
+          timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+          read: false,
+          isSystem: true
         });
-        
-        const addedNames = [];
-        for (const userId of newParticipants) {
-          const userData = await getUserById(userId);
-          if (userData) {
-            addedNames.push(`${userData.nickname} ${userData.tag}`);
-          }
-        }
-        
-        await db.collection('chats').doc(selectedChat.id)
-          .collection('messages')
-          .add({
-            text: `✅ Добавлены: ${addedNames.join(', ')}`,
-            senderId: 'system',
-            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            read: false,
-            isSystem: true
-          });
-        
-        openChatInfo(selectedChat.id);
-        
-      } catch (error) {
-        console.error('Ошибка добавления участников:', error);
-        alert('Ошибка при добавлении участников');
+    }
+    
+    // Получаем обновленные данные чата
+    const updatedChatDoc = await db.collection('chats').doc(selectedChat.id).get();
+    const updatedChat = updatedChatDoc.data();
+    
+    // Обновляем selectedChat в памяти
+    selectedChat = {
+      ...selectedChat,
+      participants: updatedChat.participants
+    };
+    
+    // Обновляем информацию в модалке
+    await openChatInfo(selectedChat.id);
+    
+    // Обновляем количество участников в шапке
+    updateChatHeaderParticipantCount();
+    
+  } catch (error) {
+    console.error('Ошибка удаления участника:', error);
+    alert('Ошибка при удалении участника');
+  }
+}
+
+    // ---------- Добавление участников в беседу ----------
+async function addSelectedParticipants() {
+  if (!selectedChat) return;
+  
+  const checkboxes = document.querySelectorAll('#addParticipantsList input[type="checkbox"]:checked');
+  if (checkboxes.length === 0) {
+    alert('Выберите пользователей для добавления');
+    return;
+  }
+  
+  const newParticipants = [];
+  checkboxes.forEach(cb => newParticipants.push(cb.value));
+  
+  try {
+    // Добавляем новых участников
+    await db.collection('chats').doc(selectedChat.id).update({
+      participants: firebase.firestore.FieldValue.arrayUnion(...newParticipants)
+    });
+    
+    // Отправляем системное сообщение о добавлении
+    const addedNames = [];
+    for (const userId of newParticipants) {
+      const userData = await getUserById(userId);
+      if (userData) {
+        addedNames.push(`${userData.nickname} ${userData.tag}`);
       }
     }
+    
+    await db.collection('chats').doc(selectedChat.id)
+      .collection('messages')
+      .add({
+        text: `✅ Добавлены: ${addedNames.join(', ')}`,
+        senderId: 'system',
+        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+        read: false,
+        isSystem: true
+      });
+    
+    // Получаем обновленные данные чата
+    const updatedChatDoc = await db.collection('chats').doc(selectedChat.id).get();
+    const updatedChat = updatedChatDoc.data();
+    
+    // Обновляем selectedChat в памяти
+    selectedChat = {
+      ...selectedChat,
+      participants: updatedChat.participants
+    };
+    
+    // Обновляем информацию в модалке
+    await openChatInfo(selectedChat.id);
+    
+    // Обновляем количество участников в шапке
+    updateChatHeaderParticipantCount();
+    
+  } catch (error) {
+    console.error('Ошибка добавления участников:', error);
+    alert('Ошибка при добавлении участников');
+  }
+}
 
     async function leaveCurrentGroup() {
       if (!selectedChat || !selectedChat.isGroup) return;
