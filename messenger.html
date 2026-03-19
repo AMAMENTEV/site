@@ -360,6 +360,8 @@ unreadQuery.forEach(msgDoc => {
     }
   }
   
+  // В личных чатах считаем только те, где receiverId === currentUser.uid
+  // В групповых считаем все, где senderId !== currentUser.uid
   if (chat.isGroup) {
     if (msg.senderId !== currentUser.uid) {
       unreadCount++;
@@ -370,6 +372,9 @@ unreadQuery.forEach(msgDoc => {
     }
   }
 });
+
+// Сохраняем в память и в newUnreadCounts
+newUnreadCounts[doc.id] = unreadCount;
           }
           
           newUnreadCounts[doc.id] = unreadCount;
@@ -777,13 +782,13 @@ async function markMessagesAsRead(chatId) {
     // Просто обновляем счетчик в памяти
     unreadCounts[chatId] = 0;
     
-    // НЕ ОБНОВЛЯЕМ СПИСОК ЧАТОВ!
-    // Убираем вызов listenForChats()
+    // НИЧЕГО БОЛЬШЕ НЕ ВЫЗЫВАЕМ!
     
   } catch (error) {
     console.error('Ошибка при отметке сообщений как прочитанных:', error);
   }
 }
+
 // ---------- Обновление одного чата в списке ----------
 function updateSingleChatInList(chatId) {
   // Находим чат в allChats
@@ -912,7 +917,7 @@ function loadMessages() {
       if (hasNewMessageFromOther) {
   await batch.commit();
   unreadCounts[currentChatId] = 0;
-  // НЕ ОБНОВЛЯЕМ СПИСОК ЧАТОВ
+  // НИЧЕГО НЕ ДЕЛАЕМ
 }
       
       // Генерируем HTML с датами
@@ -1017,7 +1022,7 @@ function loadMessages() {
     
     if (!selectedChat.isGroup) {
       const otherUserId = selectedChat.participants.find(id => id !== currentUser.uid);
-      messageData.receiverId = otherUserId;
+      messageData.receiverId = otherUserId; // Это критически важно для подсчета!
     }
     
     await db.collection('chats').doc(currentChatId)
@@ -1028,8 +1033,6 @@ function loadMessages() {
       lastMessage: text,
       lastMessageTime: firebase.firestore.FieldValue.serverTimestamp()
     });
-    
-    // НИЧЕГО НЕ ДЕЛАЕМ - слушатель сам обновит список у всех
     
   } catch (error) {
     console.error('Ошибка отправки:', error);
