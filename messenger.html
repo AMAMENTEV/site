@@ -345,30 +345,31 @@ function listenForChats() {
           
           // Если в памяти нет, считаем (только при первой загрузке)
           if (unreadCount === undefined) {
-            const unreadQuery = await db.collection('chats').doc(doc.id)
-              .collection('messages')
-              .where('read', '==', false)
-              .get();
-            
-            unreadCount = 0;
-            unreadQuery.forEach(msgDoc => {
-              const msg = msgDoc.data();
-              if (msg.deletedFor) {
-                if (msg.deletedFor.includes('everyone') || msg.deletedFor.includes(currentUser.uid)) {
-                  return;
-                }
-              }
-              
-              if (chat.isGroup) {
-                if (msg.senderId !== currentUser.uid) {
-                  unreadCount++;
-                }
-              } else {
-                if (msg.receiverId === currentUser.uid) {
-                  unreadCount++;
-                }
-              }
-            });
+            // Считаем непрочитанные (всегда свежие данные)
+const unreadQuery = await db.collection('chats').doc(doc.id)
+  .collection('messages')
+  .where('read', '==', false)
+  .get();
+
+let unreadCount = 0;
+unreadQuery.forEach(msgDoc => {
+  const msg = msgDoc.data();
+  if (msg.deletedFor) {
+    if (msg.deletedFor.includes('everyone') || msg.deletedFor.includes(currentUser.uid)) {
+      return;
+    }
+  }
+  
+  if (chat.isGroup) {
+    if (msg.senderId !== currentUser.uid) {
+      unreadCount++;
+    }
+  } else {
+    if (msg.receiverId === currentUser.uid) {
+      unreadCount++;
+    }
+  }
+});
           }
           
           newUnreadCounts[doc.id] = unreadCount;
@@ -771,13 +772,14 @@ async function markMessagesAsRead(chatId) {
     // Обновляем счетчик в памяти
     unreadCounts[chatId] = 0;
     
-    // Обновляем ТОЛЬКО UI этого чата
+    // Обновляем ТОЛЬКО UI этого чата у себя
     updateUnreadBadge(chatId, 0);
     
   } catch (error) {
     console.error('Ошибка при отметке сообщений как прочитанных:', error);
   }
 }
+
 // ---------- Обновление одного чата в списке ----------
 function updateSingleChatInList(chatId) {
   // Находим чат в allChats
@@ -907,7 +909,7 @@ function loadMessages() {
   await batch.commit();
   unreadCounts[currentChatId] = 0;
   
-  // Обновляем ТОЛЬКО UI этого чата
+  // Обновляем ТОЛЬКО UI этого чата у себя
   updateUnreadBadge(currentChatId, 0);
 }
       
@@ -996,42 +998,43 @@ function loadMessages() {
 }
 
 
-    // ---------- Отправка сообщения ----------
     async function sendMessage() {
-      const input = document.getElementById('messageInput');
-      const text = input.value.trim();
-      if (!text || !currentChatId || !selectedChat) return;
+  const input = document.getElementById('messageInput');
+  const text = input.value.trim();
+  if (!text || !currentChatId || !selectedChat) return;
 
-      input.value = '';
+  input.value = '';
 
-      try {
-        const messageData = {
-          text: text,
-          senderId: currentUser.uid,
-          timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-          read: false
-        };
-        
-        if (!selectedChat.isGroup) {
-          const otherUserId = selectedChat.participants.find(id => id !== currentUser.uid);
-          messageData.receiverId = otherUserId;
-        }
-        
-        await db.collection('chats').doc(currentChatId)
-          .collection('messages')
-          .add(messageData);
-          
-        await db.collection('chats').doc(currentChatId).update({
-          lastMessage: text,
-          lastMessageTime: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        
-      } catch (error) {
-        console.error('Ошибка отправки:', error);
-        alert('Ошибка при отправке сообщения');
-        input.value = text;
-      }
+  try {
+    const messageData = {
+      text: text,
+      senderId: currentUser.uid,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+      read: false
+    };
+    
+    if (!selectedChat.isGroup) {
+      const otherUserId = selectedChat.participants.find(id => id !== currentUser.uid);
+      messageData.receiverId = otherUserId;
     }
+    
+    await db.collection('chats').doc(currentChatId)
+      .collection('messages')
+      .add(messageData);
+      
+    await db.collection('chats').doc(currentChatId).update({
+      lastMessage: text,
+      lastMessageTime: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    
+    // НИЧЕГО НЕ ДЕЛАЕМ - слушатель сам обновит список у всех
+    
+  } catch (error) {
+    console.error('Ошибка отправки:', error);
+    alert('Ошибка при отправке сообщения');
+    input.value = text;
+  }
+}
 
     // ---------- Создание группового чата ----------
     function showCreateGroupModal() {
