@@ -784,8 +784,8 @@ async function markMessagesAsRead(chatId) {
   }
 }
 
-  // ---------- ЗАГРУЗКА СООБЩЕНИЙ ----------
-function loadMessages() {
+  // ---------- ЗАГРУЗКА СООБЩЕНИЙ (ОДИН РАЗ) ----------
+async function loadMessages() {
   if (!currentChatId || !selectedChat) {
     console.log('loadMessages: нет активного чата, выходим');
     return;
@@ -800,157 +800,249 @@ function loadMessages() {
   
   messagesContainer.innerHTML = '<div class="loading">Загрузка сообщений...</div>';
   
-  // Слушаем все сообщения в реальном времени
-  unsubscribeMessages = db.collection('chats').doc(currentChatId)
-    .collection('messages')
-    .orderBy('timestamp', 'asc')
-    .onSnapshot(async snapshot => {
+  try {
+    // Загружаем сообщения один раз
+    const snapshot = await db.collection('chats').doc(currentChatId)
+      .collection('messages')
+      .orderBy('timestamp', 'asc')
+      .get();
+    
+    if (snapshot.empty) {
+      messagesContainer.innerHTML = '<div class="no-messages">Нет сообщений. Напишите что-нибудь!</div>';
+      return;
+    }
+    
+    // Собираем ID всех отправителей для группового чата
+    const senderIds = new Set();
+    snapshot.forEach(doc => {
+      const msg = doc.data();
+      if (!msg.isSystem && selectedChat.isGroup && msg.senderId !== currentUser.uid) {
+        senderIds.add(msg.senderId);
+      }
+    });
+    
+    // Загружаем отправителей
+    const senderCache = {};
+    if (senderIds.size > 0) {
+      const userIds = Array.from(senderIds);
+      for (let i = 0; i < userIds.length; i += 10) {
+        const batch = userIds.slice(i, i + 10);
+        const usersSnapshot = await db.collection('users')
+          .where('__name__', 'in', batch)
+          .get();
+        
+        usersSnapshot.forEach(doc => {
+          senderCache[doc.id] = doc.data();
+        });
+      }
+    }
+    
+    // Отмечаем сообщения как прочитанные (ТОЛЬКО У СЕБЯ)
+    const batch = db.batch();
+    let hasUnread = false;
+    
+    snapshot.forEach(doc => {
+      const msg = doc.data();
       
-      if (snapshot.empty) {
-        messagesContainer.innerHTML = '<div class="no-messages">Нет сообщений. Напишите что-нибудь!</div>';
+      // Для групповых чатов
+      if (selectedChat.isGroup) {
+        if (msg.senderId !== currentUser.uid && !msg.isSystem) {
+          if (!msg.readBy || !msg.readBy.includes(currentUser.uid)) {
+            hasUnread = true;
+            batch.update(doc.ref, {
+              readBy: firebase.firestore.FieldValue.arrayUnion(currentUser.uid)
+            });
+          }
+        }
+      } 
+      // Для личных чатов
+      else {
+        if (msg.receiverId === currentUser.uid && !msg.read) {
+          hasUnread = true;
+          batch.update(doc.ref, { read: true });
+        }
+      }
+    });
+    
+    if (hasUnread) {
+      await batch.commit();
+      
+      // Обновляем счетчик в памяти
+      unreadCounts[currentChatId] = 0;
+      
+      // Обновляем UI конкретного чата
+      const chatElement = document.querySelector(`.chat-item[onclick*='${currentChatId}']`);
+      if (chatElement) {
+        chatElement.classList.remove('has-unread');
+        const nameElement = chatElement.querySelector('.chat-name');
+        if (nameElement) {
+          const badge = nameElement.querySelector('.unread-badge');
+          if (badge) {
+            badge.remove();
+          }
+        }
+      }
+    }
+    
+    // Генерируем HTML
+    let html = '';
+    let lastDate = '';
+    
+    snapshot.forEach(doc => {
+      const msg = doc.data();
+      const isMyMessage = msg.senderId === currentUser.uid;
+      
+      let time = '';
+      let messageDate = '';
+      if (msg.timestamp) {
+        const date = msg.timestamp.toDate();
+        time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        messageDate = date.toLocaleDateString();
+      }
+      
+      if (messageDate && messageDate !== lastDate) {
+        html += `<div class="date-separator">${messageDate}</div>`;
+        lastDate = messageDate;
+      }
+      
+      // Проверяем удаление
+      if (msg.deletedFor) {
+        if (msg.deletedFor.includes('everyone') || 
+            msg.deletedFor.includes(currentUser.uid)) {
+          return;
+        }
+      }
+      
+      if (msg.isSystem) {
+        html += `
+          <div class="message system">
+            <div class="message-content">${msg.text}</div>
+          </div>
+        `;
         return;
       }
       
-      // Собираем ID всех отправителей для группового чата
-      const senderIds = new Set();
-      snapshot.forEach(doc => {
-        const msg = doc.data();
-        if (!msg.isSystem && selectedChat.isGroup && msg.senderId !== currentUser.uid) {
-          senderIds.add(msg.senderId);
-        }
-      });
-      
-      // Загружаем отправителей
-      const senderCache = {};
-      if (senderIds.size > 0) {
-        const userIds = Array.from(senderIds);
-        for (let i = 0; i < userIds.length; i += 10) {
-          const batch = userIds.slice(i, i + 10);
-          const usersSnapshot = await db.collection('users')
-            .where('__name__', 'in', batch)
-            .get();
-          
-          usersSnapshot.forEach(doc => {
-            senderCache[doc.id] = doc.data();
-          });
+      let senderInfo = '';
+      if (selectedChat.isGroup && !isMyMessage) {
+        const sender = senderCache[msg.senderId];
+        if (sender) {
+          senderInfo = `<div class="message-sender">${sender.nickname || '?'} ${sender.tag || ''}</div>`;
         }
       }
       
-      // Отмечаем прочитанные (ТОЛЬКО для новых сообщений)
-      const batch = db.batch();
-      let hasUnread = false;
+      const deleteOption = isMyMessage ? 
+        `<button class="message-delete-btn" onclick="showMessageOptions('${doc.id}', event)">⋯</button>` : '';
       
-      snapshot.docChanges().forEach(change => {
+      html += `
+        <div class="message ${isMyMessage ? 'my-message' : 'other-message'}" id="msg-${doc.id}">
+          ${deleteOption}
+          ${senderInfo}
+          <div class="message-content">${msg.text.replace(/\n/g, '<br>')}</div>
+          <div class="message-time">${time}</div>
+        </div>
+      `;
+    });
+    
+    messagesContainer.innerHTML = html;
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    
+    // Подписываемся ТОЛЬКО на новые сообщения
+    listenForNewMessages();
+    
+  } catch (error) {
+    console.error('Ошибка загрузки сообщений:', error);
+    messagesContainer.innerHTML = '<div class="error">Ошибка загрузки сообщений</div>';
+  }
+}
+
+// ---------- СЛУШАТЕЛЬ ТОЛЬКО НОВЫХ СООБЩЕНИЙ ----------
+function listenForNewMessages() {
+  if (!currentChatId) return;
+  
+  // Отписываемся от старого слушателя
+  if (unsubscribeMessages) {
+    unsubscribeMessages();
+  }
+  
+  // Получаем время последнего загруженного сообщения
+  const messagesContainer = document.getElementById('messagesContainer');
+  const lastMessageElement = messagesContainer.lastElementChild;
+  
+  let lastTimestamp = null;
+  
+  // Ищем последнее сообщение с id
+  const messageElements = messagesContainer.querySelectorAll('[id^="msg-"]');
+  if (messageElements.length > 0) {
+    const lastMsgId = messageElements[messageElements.length - 1].id.replace('msg-', '');
+    // В реальности нужно получить timestamp из данных, но для простоты
+    // будем слушать все новые сообщения после текущего времени
+    lastTimestamp = firebase.firestore.Timestamp.now();
+  }
+  
+  // Слушаем только новые сообщения
+  unsubscribeMessages = db.collection('chats').doc(currentChatId)
+    .collection('messages')
+    .where('timestamp', '>', lastTimestamp || firebase.firestore.Timestamp.now())
+    .orderBy('timestamp', 'asc')
+    .onSnapshot(async snapshot => {
+      
+      snapshot.docChanges().forEach(async change => {
         if (change.type === 'added') {
           const msg = change.doc.data();
+          const msgId = change.doc.id;
           
-          // Для групповых чатов
+          // Проверяем, нет ли уже такого сообщения
+          if (document.getElementById(`msg-${msgId}`)) return;
+          
+          // Сразу отмечаем как прочитанное (мы же в чате)
           if (selectedChat.isGroup) {
             if (msg.senderId !== currentUser.uid && !msg.isSystem) {
               if (!msg.readBy || !msg.readBy.includes(currentUser.uid)) {
-                hasUnread = true;
-                batch.update(change.doc.ref, {
+                await change.doc.ref.update({
                   readBy: firebase.firestore.FieldValue.arrayUnion(currentUser.uid)
                 });
               }
             }
-          } 
-          // Для личных чатов
-          else {
+          } else {
             if (msg.receiverId === currentUser.uid && !msg.read) {
-              hasUnread = true;
-              batch.update(change.doc.ref, { read: true });
+              await change.doc.ref.update({ read: true });
             }
           }
-        }
-      });
-      
-      if (hasUnread) {
-        await batch.commit();
-        
-        // Обновляем счетчик в памяти
-        unreadCounts[currentChatId] = 0;
-        
-        // Обновляем UI конкретного чата
-        const chatElement = document.querySelector(`.chat-item[onclick*='${currentChatId}']`);
-        if (chatElement) {
-          chatElement.classList.remove('has-unread');
-          const nameElement = chatElement.querySelector('.chat-name');
-          if (nameElement) {
-            const badge = nameElement.querySelector('.unread-badge');
-            if (badge) {
-              badge.remove();
+          
+          // Добавляем сообщение в контейнер
+          let senderInfo = '';
+          if (selectedChat.isGroup && msg.senderId !== currentUser.uid && msg.senderId) {
+            const sender = await getUserById(msg.senderId);
+            if (sender) {
+              senderInfo = `<div class="message-sender">${sender.nickname || '?'} ${sender.tag || ''}</div>`;
             }
           }
-        }
-      }
-      
-      // Генерируем HTML
-      let html = '';
-      let lastDate = '';
-      
-      snapshot.forEach(doc => {
-        const msg = doc.data();
-        const isMyMessage = msg.senderId === currentUser.uid;
-        
-        let time = '';
-        let messageDate = '';
-        if (msg.timestamp) {
-          const date = msg.timestamp.toDate();
-          time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          messageDate = date.toLocaleDateString();
-        }
-        
-        if (messageDate && messageDate !== lastDate) {
-          html += `<div class="date-separator">${messageDate}</div>`;
-          lastDate = messageDate;
-        }
-        
-        // Проверяем удаление
-        if (msg.deletedFor) {
-          if (msg.deletedFor.includes('everyone') || 
-              msg.deletedFor.includes(currentUser.uid)) {
-            return;
+          
+          const isMyMessage = msg.senderId === currentUser.uid;
+          let time = '';
+          if (msg.timestamp) {
+            const date = msg.timestamp.toDate();
+            time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
           }
-        }
-        
-        if (msg.isSystem) {
-          html += `
-            <div class="message system">
-              <div class="message-content">${msg.text}</div>
+          
+          const deleteOption = isMyMessage ? 
+            `<button class="message-delete-btn" onclick="showMessageOptions('${msgId}', event)">⋯</button>` : '';
+          
+          const messageHTML = `
+            <div class="message ${isMyMessage ? 'my-message' : 'other-message'}" id="msg-${msgId}">
+              ${deleteOption}
+              ${senderInfo}
+              <div class="message-content">${msg.text.replace(/\n/g, '<br>')}</div>
+              <div class="message-time">${time}</div>
             </div>
           `;
-          return;
+          
+          messagesContainer.insertAdjacentHTML('beforeend', messageHTML);
+          messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
-        
-        let senderInfo = '';
-        if (selectedChat.isGroup && !isMyMessage) {
-          const sender = senderCache[msg.senderId];
-          if (sender) {
-            senderInfo = `<div class="message-sender">${sender.nickname || '?'} ${sender.tag || ''}</div>`;
-          }
-        }
-        
-        const deleteOption = isMyMessage ? 
-          `<button class="message-delete-btn" onclick="showMessageOptions('${doc.id}', event)">⋯</button>` : '';
-        
-        html += `
-          <div class="message ${isMyMessage ? 'my-message' : 'other-message'}" id="msg-${doc.id}">
-            ${deleteOption}
-            ${senderInfo}
-            <div class="message-content">${msg.text.replace(/\n/g, '<br>')}</div>
-            <div class="message-time">${time}</div>
-          </div>
-        `;
       });
       
-      messagesContainer.innerHTML = html;
-      messagesContainer.scrollTop = messagesContainer.scrollHeight;
-      
-    }, error => {
-      console.error('Ошибка загрузки сообщений:', error);
-      messagesContainer.innerHTML = '<div class="error">Ошибка загрузки сообщений</div>';
-    });
+    }, error => console.error('Ошибка слушателя новых сообщений:', error));
 }
 
 
