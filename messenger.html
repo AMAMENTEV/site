@@ -346,25 +346,57 @@
                 .where('read', '==', false)
                 .get();
               
-              let unreadCount = 0;
-              unreadQuery.forEach(msgDoc => {
-                const msg = msgDoc.data();
-                if (msg.deletedFor) {
-                  if (msg.deletedFor.includes('everyone') || msg.deletedFor.includes(currentUser.uid)) {
-                    return;
-                  }
-                }
-                
-                if (chat.isGroup) {
-                  if (msg.senderId !== currentUser.uid) {
-                    unreadCount++;
-                  }
-                } else {
-                  if (msg.receiverId === currentUser.uid) {
-                    unreadCount++;
-                  }
-                }
-              });
+              // Считаем непрочитанные
+let unreadCount = 0;
+
+if (chat.isGroup) {
+  // Для групповых чатов - получаем последние 50 сообщений и проверяем readBy
+  const messagesSnapshot = await db.collection('chats').doc(doc.id)
+    .collection('messages')
+    .orderBy('timestamp', 'desc')
+    .limit(50)
+    .get();
+  
+  messagesSnapshot.forEach(msgDoc => {
+    const msg = msgDoc.data();
+    
+    // Пропускаем удаленные
+    if (msg.deletedFor) {
+      if (msg.deletedFor.includes('everyone') || msg.deletedFor.includes(currentUser.uid)) {
+        return;
+      }
+    }
+    
+    // Пропускаем системные
+    if (msg.isSystem) return;
+    
+    // Непрочитанным считается сообщение не от текущего пользователя,
+    // в котором нет его UID в readBy
+    if (msg.senderId !== currentUser.uid) {
+      if (!msg.readBy || !msg.readBy.includes(currentUser.uid)) {
+        unreadCount++;
+      }
+    }
+  });
+} else {
+  // Для личных чатов - старая логика
+  const unreadQuery = await db.collection('chats').doc(doc.id)
+    .collection('messages')
+    .where('read', '==', false)
+    .get();
+  
+  unreadQuery.forEach(msgDoc => {
+    const msg = msgDoc.data();
+    if (msg.deletedFor) {
+      if (msg.deletedFor.includes('everyone') || msg.deletedFor.includes(currentUser.uid)) {
+        return;
+      }
+    }
+    if (msg.receiverId === currentUser.uid) {
+      unreadCount++;
+    }
+  });
+}
               
               newUnreadCounts[doc.id] = unreadCount;
               
@@ -706,8 +738,13 @@ function selectChat(chat) {
   }
 }
 
-    // ---------- Отметить сообщения как прочитанные ----------
+    // ---------- Отметить сообщения как прочитанные (только для личных чатов) ----------
 async function markMessagesAsRead(chatId) {
+  // Для групповых чатов ничего не делаем - они отмечаются в loadMessages
+  if (selectedChat && selectedChat.isGroup) {
+    return;
+  }
+  
   try {
     const unreadSnapshot = await db.collection('chats').doc(chatId)
       .collection('messages')
@@ -719,15 +756,8 @@ async function markMessagesAsRead(chatId) {
     const batch = db.batch();
     unreadSnapshot.forEach(doc => {
       const msg = doc.data();
-      
-      if (selectedChat && selectedChat.isGroup) {
-        if (msg.senderId !== currentUser.uid) {
-          batch.update(doc.ref, { read: true });
-        }
-      } else {
-        if (msg.receiverId === currentUser.uid) {
-          batch.update(doc.ref, { read: true });
-        }
+      if (msg.receiverId === currentUser.uid) {
+        batch.update(doc.ref, { read: true });
       }
     });
     
@@ -736,13 +766,10 @@ async function markMessagesAsRead(chatId) {
     // Обновляем счетчик в памяти
     unreadCounts[chatId] = 0;
     
-    // Находим элемент чата в DOM и обновляем только его
+    // Обновляем UI
     const chatElement = document.querySelector(`.chat-item[onclick*='${chatId}']`);
     if (chatElement) {
-      // Убираем класс has-unread
       chatElement.classList.remove('has-unread');
-      
-      // Убираем бейдж с непрочитанными
       const nameElement = chatElement.querySelector('.chat-name');
       if (nameElement) {
         const badge = nameElement.querySelector('.unread-badge');
@@ -757,23 +784,21 @@ async function markMessagesAsRead(chatId) {
   }
 }
 
-    // ---------- ОПТИМИЗИРОВАННАЯ загрузка сообщений (с защитой от гонки) ----------
+    // ---------- ЗАГРУЗКА СООБЩЕНИЙ ----------
 function loadMessages() {
-  // ВАЖНО: проверяем, что мы всё ещё в этом чате
   if (!currentChatId || !selectedChat) {
     console.log('loadMessages: нет активного чата, выходим');
     return;
   }
   
   const messagesContainer = document.getElementById('messagesContainer');
-  const currentChatIdAtStart = currentChatId; // Запоминаем, какой чат загружаем
+  const currentChatIdAtStart = currentChatId;
   
   if (unsubscribeMessages) {
     unsubscribeMessages();
     unsubscribeMessages = null;
   }
   
-  // Добавляем индикатор загрузки
   messagesContainer.innerHTML = '<div class="loading">Загрузка сообщений...</div>';
   
   unsubscribeMessages = db.collection('chats').doc(currentChatId)
@@ -781,38 +806,31 @@ function loadMessages() {
     .orderBy('timestamp', 'asc')
     .onSnapshot(async snapshot => {
       
-      // ВАЖНО: проверяем, что мы всё ещё в том же чате
       if (currentChatId !== currentChatIdAtStart || !selectedChat) {
         console.log('Чат изменился во время загрузки, игнорируем');
         return;
       }
       
-      // Если снапшот пустой
       if (snapshot.empty) {
         messagesContainer.innerHTML = '<div class="no-messages">Нет сообщений. Напишите что-нибудь!</div>';
         return;
       }
       
-      // Собираем ID всех отправителей для группового чата (один раз)
+      // Собираем ID всех отправителей для группового чата
       const senderIds = new Set();
-      
       snapshot.forEach(doc => {
         const msg = doc.data();
-        if (!msg.isSystem && selectedChat && selectedChat.isGroup && msg.senderId !== currentUser.uid) {
+        if (!msg.isSystem && selectedChat.isGroup && msg.senderId !== currentUser.uid) {
           senderIds.add(msg.senderId);
         }
       });
       
-      // Загружаем ВСЕХ отправителей одним запросом
+      // Загружаем отправителей
       const senderCache = {};
       if (senderIds.size > 0) {
         const userIds = Array.from(senderIds);
         for (let i = 0; i < userIds.length; i += 10) {
-          // Проверяем, не ушли ли мы из чата
-          if (currentChatId !== currentChatIdAtStart || !selectedChat) {
-            console.log('Чат изменился во время загрузки пользователей, игнорируем');
-            return;
-          }
+          if (currentChatId !== currentChatIdAtStart || !selectedChat) return;
           
           const batch = userIds.slice(i, i + 10);
           const usersSnapshot = await db.collection('users')
@@ -825,45 +843,57 @@ function loadMessages() {
         }
       }
       
-      // Ещё одна проверка перед отрисовкой
-      if (currentChatId !== currentChatIdAtStart || !selectedChat) {
-        console.log('Чат изменился перед отрисовкой, игнорируем');
-        return;
-      }
-      
-      // Отмечаем прочитанные (если нужно)
-      let hasNewMessageFromOther = false;
+      // Отмечаем прочитанные
       const batch = db.batch();
+      let hasNewMessageFromOther = false;
       
       snapshot.docChanges().forEach(change => {
         if (change.type === 'added') {
           const msg = change.doc.data();
-          if (msg.senderId !== currentUser.uid && !msg.isSystem) {
-            hasNewMessageFromOther = true;
-            batch.update(change.doc.ref, { read: true });
+          
+          // Для групповых чатов
+          if (selectedChat.isGroup) {
+            if (msg.senderId !== currentUser.uid && !msg.isSystem) {
+              hasNewMessageFromOther = true;
+              // Добавляем пользователя в readBy
+              if (!msg.readBy || !msg.readBy.includes(currentUser.uid)) {
+                batch.update(change.doc.ref, {
+                  readBy: firebase.firestore.FieldValue.arrayUnion(currentUser.uid)
+                });
+              }
+            }
+          } 
+          // Для личных чатов
+          else {
+            if (msg.receiverId === currentUser.uid && !msg.read) {
+              hasNewMessageFromOther = true;
+              batch.update(change.doc.ref, { read: true });
+            }
           }
         }
       });
       
       if (hasNewMessageFromOther) {
-  await batch.commit();
-  unreadCounts[currentChatId] = 0;
-  
-  // Обновляем только этот чат в списке
-  const chatElement = document.querySelector(`.chat-item[onclick*='${currentChatId}']`);
-  if (chatElement) {
-    chatElement.classList.remove('has-unread');
-    const nameElement = chatElement.querySelector('.chat-name');
-    if (nameElement) {
-      const badge = nameElement.querySelector('.unread-badge');
-      if (badge) {
-        badge.remove();
+        await batch.commit();
+        
+        // Обновляем счетчик в памяти
+        unreadCounts[currentChatId] = 0;
+        
+        // Обновляем UI конкретного чата
+        const chatElement = document.querySelector(`.chat-item[onclick*='${currentChatId}']`);
+        if (chatElement) {
+          chatElement.classList.remove('has-unread');
+          const nameElement = chatElement.querySelector('.chat-name');
+          if (nameElement) {
+            const badge = nameElement.querySelector('.unread-badge');
+            if (badge) {
+              badge.remove();
+            }
+          }
+        }
       }
-    }
-  }
-}
       
-      // Генерируем HTML с датами
+      // Генерируем HTML
       let html = '';
       let lastDate = '';
       
@@ -871,7 +901,13 @@ function loadMessages() {
         const msg = doc.data();
         const isMyMessage = msg.senderId === currentUser.uid;
         
-        // Форматируем дату и время
+        // Проверяем, прочитано ли сообщение (для групповых)
+        if (selectedChat.isGroup && !isMyMessage) {
+          if (!msg.readBy || !msg.readBy.includes(currentUser.uid)) {
+            // Если сообщение не прочитано - ничего не делаем, оно отобразится
+          }
+        }
+        
         let time = '';
         let messageDate = '';
         if (msg.timestamp) {
@@ -880,7 +916,6 @@ function loadMessages() {
           messageDate = date.toLocaleDateString();
         }
         
-        // Добавляем разделитель даты, если день изменился
         if (messageDate && messageDate !== lastDate) {
           html += `<div class="date-separator">${messageDate}</div>`;
           lastDate = messageDate;
@@ -889,12 +924,11 @@ function loadMessages() {
         // Проверяем удаление
         if (msg.deletedFor) {
           if (msg.deletedFor.includes('everyone') || 
-              (msg.deletedFor && msg.deletedFor.includes(currentUser.uid))) {
+              msg.deletedFor.includes(currentUser.uid)) {
             return;
           }
         }
         
-        // Системные сообщения
         if (msg.isSystem) {
           html += `
             <div class="message system">
@@ -904,18 +938,14 @@ function loadMessages() {
           return;
         }
         
-        // Информация об отправителе для группового чата
         let senderInfo = '';
-        if (selectedChat && selectedChat.isGroup && !isMyMessage) {
+        if (selectedChat.isGroup && !isMyMessage) {
           const sender = senderCache[msg.senderId];
           if (sender) {
             senderInfo = `<div class="message-sender">${sender.nickname || '?'} ${sender.tag || ''}</div>`;
-          } else {
-            senderInfo = `<div class="message-sender">Пользователь</div>`;
           }
         }
         
-        // Кнопка удаления для своих сообщений
         const deleteOption = isMyMessage ? 
           `<button class="message-delete-btn" onclick="showMessageOptions('${doc.id}', event)">⋯</button>` : '';
         
@@ -929,18 +959,11 @@ function loadMessages() {
         `;
       });
       
-      // Финальная проверка перед отрисовкой
-      if (currentChatId !== currentChatIdAtStart || !selectedChat) {
-        console.log('Чат изменился перед финальной отрисовкой, игнорируем');
-        return;
-      }
-      
       messagesContainer.innerHTML = html;
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
       
     }, error => {
       console.error('Ошибка загрузки сообщений:', error);
-      // Проверяем, что мы всё ещё в этом чате
       if (currentChatId === currentChatIdAtStart && selectedChat) {
         messagesContainer.innerHTML = '<div class="error">Ошибка загрузки сообщений</div>';
       }
@@ -949,41 +972,45 @@ function loadMessages() {
 
 
     // ---------- Отправка сообщения ----------
-    async function sendMessage() {
-      const input = document.getElementById('messageInput');
-      const text = input.value.trim();
-      if (!text || !currentChatId || !selectedChat) return;
+async function sendMessage() {
+  const input = document.getElementById('messageInput');
+  const text = input.value.trim();
+  if (!text || !currentChatId || !selectedChat) return;
 
-      input.value = '';
+  input.value = '';
 
-      try {
-        const messageData = {
-          text: text,
-          senderId: currentUser.uid,
-          timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-          read: false
-        };
-        
-        if (!selectedChat.isGroup) {
-          const otherUserId = selectedChat.participants.find(id => id !== currentUser.uid);
-          messageData.receiverId = otherUserId;
-        }
-        
-        await db.collection('chats').doc(currentChatId)
-          .collection('messages')
-          .add(messageData);
-          
-        await db.collection('chats').doc(currentChatId).update({
-          lastMessage: text,
-          lastMessageTime: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        
-      } catch (error) {
-        console.error('Ошибка отправки:', error);
-        alert('Ошибка при отправке сообщения');
-        input.value = text;
-      }
+  try {
+    const messageData = {
+      text: text,
+      senderId: currentUser.uid,
+      timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    
+    if (selectedChat.isGroup) {
+      // Для групп - массив прочитавших
+      messageData.readBy = [currentUser.uid];
+    } else {
+      // Для личных - receiverId и read
+      const otherUserId = selectedChat.participants.find(id => id !== currentUser.uid);
+      messageData.receiverId = otherUserId;
+      messageData.read = false;
     }
+    
+    await db.collection('chats').doc(currentChatId)
+      .collection('messages')
+      .add(messageData);
+      
+    await db.collection('chats').doc(currentChatId).update({
+      lastMessage: text,
+      lastMessageTime: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    
+  } catch (error) {
+    console.error('Ошибка отправки:', error);
+    alert('Ошибка при отправке сообщения');
+    input.value = text;
+  }
+}
 
     // ---------- Создание группового чата ----------
     function showCreateGroupModal() {
