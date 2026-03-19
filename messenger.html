@@ -843,20 +843,21 @@ function loadMessages() {
         }
       }
       
-      // Отмечаем прочитанные
+      // Отмечаем прочитанные ТОЛЬКО для новых сообщений
       const batch = db.batch();
       let hasNewMessageFromOther = false;
       
       snapshot.docChanges().forEach(change => {
+        // ВАЖНО: отмечаем только добавленные сообщения (change.type === 'added')
         if (change.type === 'added') {
           const msg = change.doc.data();
           
           // Для групповых чатов
           if (selectedChat.isGroup) {
             if (msg.senderId !== currentUser.uid && !msg.isSystem) {
-              hasNewMessageFromOther = true;
-              // Добавляем пользователя в readBy
+              // Добавляем пользователя в readBy, если его там нет
               if (!msg.readBy || !msg.readBy.includes(currentUser.uid)) {
+                hasNewMessageFromOther = true;
                 batch.update(change.doc.ref, {
                   readBy: firebase.firestore.FieldValue.arrayUnion(currentUser.uid)
                 });
@@ -900,13 +901,6 @@ function loadMessages() {
       snapshot.forEach(doc => {
         const msg = doc.data();
         const isMyMessage = msg.senderId === currentUser.uid;
-        
-        // Проверяем, прочитано ли сообщение (для групповых)
-        if (selectedChat.isGroup && !isMyMessage) {
-          if (!msg.readBy || !msg.readBy.includes(currentUser.uid)) {
-            // Если сообщение не прочитано - ничего не делаем, оно отобразится
-          }
-        }
         
         let time = '';
         let messageDate = '';
