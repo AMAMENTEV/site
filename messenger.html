@@ -706,7 +706,7 @@ function selectChat(chat) {
   }
 }
 
-    // ---------- Отметить сообщения как прочитанные ----------
+     // ---------- Отметить сообщения как прочитанные ----------
     async function markMessagesAsRead(chatId) {
       try {
         const unreadSnapshot = await db.collection('chats').doc(chatId)
@@ -735,10 +735,7 @@ function selectChat(chat) {
         
         unreadCounts[chatId] = 0;
         
-        // Обновляем слушатель чатов
-        if (unsubscribeChats) {
-          listenForChats();
-        }
+	displayChats();
         
       } catch (error) {
         console.error('Ошибка при отметке сообщений как прочитанных:', error);
