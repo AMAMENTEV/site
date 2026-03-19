@@ -728,20 +728,55 @@ async function markMessagesAsRead(chatId) {
     
     await batch.commit();
     
-    // Обновляем счетчик в памяти
+    // Просто обновляем счетчик в памяти
     unreadCounts[chatId] = 0;
     
-    // ПРИНУДИТЕЛЬНО обновляем список чатов
-    if (unsubscribeChats) {
-      unsubscribeChats(); // Отписываемся от старого слушателя
-    }
-    listenForChats(); // Запускаем новый слушатель
+    // НЕ перезапускаем весь слушатель!
+    // Вместо этого обновляем только этот конкретный чат в DOM
+    updateSingleChatInList(chatId);
     
   } catch (error) {
     console.error('Ошибка при отметке сообщений как прочитанных:', error);
   }
 }
 
+// ---------- Обновление одного чата в списке ----------
+function updateSingleChatInList(chatId) {
+  // Находим чат в allChats
+  const chat = allChats.find(c => c.id === chatId);
+  if (!chat) return;
+  
+  // Находим элемент в DOM
+  const chatElement = document.querySelector(`.chat-item[onclick*='${chatId}']`);
+  if (!chatElement) return;
+  
+  // Обновляем счетчик непрочитанных
+  const unreadCount = unreadCounts[chatId] || 0;
+  
+  // Обновляем класс
+  if (unreadCount > 0) {
+    chatElement.classList.add('has-unread');
+  } else {
+    chatElement.classList.remove('has-unread');
+  }
+  
+  // Обновляем бейдж с непрочитанными
+  const nameElement = chatElement.querySelector('.chat-name');
+  if (nameElement) {
+    const badge = nameElement.querySelector('.unread-badge');
+    if (unreadCount > 0) {
+      if (badge) {
+        badge.textContent = unreadCount;
+      } else {
+        nameElement.innerHTML += `<span class="unread-badge">${unreadCount}</span>`;
+      }
+    } else {
+      if (badge) {
+        badge.remove();
+      }
+    }
+  }
+}
     // ---------- ОПТИМИЗИРОВАННАЯ загрузка сообщений (с защитой от гонки) ----------
 function loadMessages() {
   // ВАЖНО: проверяем, что мы всё ещё в этом чате
@@ -834,11 +869,8 @@ function loadMessages() {
   await batch.commit();
   unreadCounts[currentChatId] = 0;
   
-  // Обновляем список чатов при получении новых сообщений
-  if (unsubscribeChats) {
-    unsubscribeChats();
-  }
-  listenForChats();
+  // Обновляем ТОЛЬКО этот чат в списке
+  updateSingleChatInList(currentChatId);
 }
       
       // Генерируем HTML с датами
