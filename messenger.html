@@ -706,7 +706,7 @@ function selectChat(chat) {
   }
 }
 
-    // ---------- Отметить сообщения как прочитанные ----------
+// ---------- Отметить сообщения как прочитанные ----------
 async function markMessagesAsRead(chatId) {
   try {
     const unreadSnapshot = await db.collection('chats').doc(chatId)
@@ -730,6 +730,12 @@ async function markMessagesAsRead(chatId) {
     
     // Обновляем счетчик в памяти
     unreadCounts[chatId] = 0;
+    
+    // ПРИНУДИТЕЛЬНО обновляем список чатов
+    if (unsubscribeChats) {
+      unsubscribeChats(); // Отписываемся от старого слушателя
+    }
+    listenForChats(); // Запускаем новый слушатель
     
   } catch (error) {
     console.error('Ошибка при отметке сообщений как прочитанных:', error);
@@ -825,9 +831,15 @@ function loadMessages() {
       });
       
       if (hasNewMessageFromOther) {
-        await batch.commit();
-        unreadCounts[currentChatId] = 0;
-      }
+  await batch.commit();
+  unreadCounts[currentChatId] = 0;
+  
+  // Обновляем список чатов при получении новых сообщений
+  if (unsubscribeChats) {
+    unsubscribeChats();
+  }
+  listenForChats();
+}
       
       // Генерируем HTML с датами
       let html = '';
@@ -1127,6 +1139,12 @@ async function removeParticipant(userId) {
     // Обновляем количество участников в шапке
     updateChatHeaderParticipantCount();
     
+    // ПРИНУДИТЕЛЬНО обновляем список чатов
+    if (unsubscribeChats) {
+      unsubscribeChats();
+    }
+    listenForChats();
+    
   } catch (error) {
     console.error('Ошибка удаления участника:', error);
     alert('Ошибка при удалении участника');
@@ -1186,6 +1204,12 @@ async function addSelectedParticipants() {
     
     // Обновляем количество участников в шапке
     updateChatHeaderParticipantCount();
+    
+    // ПРИНУДИТЕЛЬНО обновляем список чатов
+    if (unsubscribeChats) {
+      unsubscribeChats();
+    }
+    listenForChats();
     
   } catch (error) {
     console.error('Ошибка добавления участников:', error);
