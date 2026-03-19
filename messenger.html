@@ -707,6 +707,7 @@ function selectChat(chat) {
 }
 
 // ---------- Отметить сообщения как прочитанные ----------
+// ---------- Отметить сообщения как прочитанные ----------
 async function markMessagesAsRead(chatId) {
   try {
     const unreadSnapshot = await db.collection('chats').doc(chatId)
@@ -728,18 +729,17 @@ async function markMessagesAsRead(chatId) {
     
     await batch.commit();
     
-    // Просто обновляем счетчик в памяти
+    // Просто обновляем счетчик в памяти - этого достаточно!
     unreadCounts[chatId] = 0;
     
-    // НЕ перезапускаем весь слушатель!
-    // Вместо этого обновляем только этот конкретный чат в DOM
-    updateSingleChatInList(chatId);
+    // НИЧЕГО БОЛЬШЕ НЕ ДЕЛАЕМ!
+    // Не обновляем DOM, не перезапускаем слушатели
+    // Счетчик обновится сам при следующей перерисовке списка чатов
     
   } catch (error) {
     console.error('Ошибка при отметке сообщений как прочитанных:', error);
   }
 }
-
 // ---------- Обновление одного чата в списке ----------
 function updateSingleChatInList(chatId) {
   // Находим чат в allChats
@@ -869,8 +869,7 @@ function loadMessages() {
   await batch.commit();
   unreadCounts[currentChatId] = 0;
   
-  // Обновляем ТОЛЬКО этот чат в списке
-  updateSingleChatInList(currentChatId);
+  // НИЧЕГО НЕ ДЕЛАЕМ - просто обновляем счетчик в памяти
 }
       
       // Генерируем HTML с датами
