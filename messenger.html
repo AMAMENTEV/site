@@ -761,25 +761,29 @@ async function markMessagesAsRead(chatId) {
     unreadSnapshot.forEach(doc => {
       const msg = doc.data();
       
-      // Помечаем как прочитанные, если сообщение не от текущего пользователя
-      if (msg.senderId !== currentUser.uid) {
-        batch.update(doc.ref, { read: true });
+      if (selectedChat && selectedChat.isGroup) {
+        if (msg.senderId !== currentUser.uid) {
+          batch.update(doc.ref, { read: true });
+        }
+      } else {
+        if (msg.receiverId === currentUser.uid) {
+          batch.update(doc.ref, { read: true });
+        }
       }
     });
     
     await batch.commit();
     
-    // Обновляем счетчик в памяти
+    // Просто обновляем счетчик в памяти
     unreadCounts[chatId] = 0;
     
-    // Обновляем ТОЛЬКО UI этого чата у себя
-    updateUnreadBadge(chatId, 0);
+    // НЕ ОБНОВЛЯЕМ СПИСОК ЧАТОВ!
+    // Убираем вызов listenForChats()
     
   } catch (error) {
     console.error('Ошибка при отметке сообщений как прочитанных:', error);
   }
 }
-
 // ---------- Обновление одного чата в списке ----------
 function updateSingleChatInList(chatId) {
   // Находим чат в allChats
@@ -908,9 +912,7 @@ function loadMessages() {
       if (hasNewMessageFromOther) {
   await batch.commit();
   unreadCounts[currentChatId] = 0;
-  
-  // Обновляем ТОЛЬКО UI этого чата у себя
-  updateUnreadBadge(currentChatId, 0);
+  // НЕ ОБНОВЛЯЕМ СПИСОК ЧАТОВ
 }
       
       // Генерируем HTML с датами
