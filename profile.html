@@ -5,11 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script>
     (function () {
-      // Проверяем localStorage и применяем тему до загрузки CSS
       const savedTheme = localStorage.getItem('theme');
       if (savedTheme === 'dark') {
-        document.documentElement.style.backgroundColor = '#0f0f0f';
+        document.documentElement.classList.add('dark-theme');
+        document.body.classList.add('dark-theme');
         document.body.style.backgroundColor = '#0f0f0f';
+      } else {
+        document.documentElement.classList.add('light-theme');
+        document.body.classList.add('light-theme');
+        document.body.style.backgroundColor = '#ffffff';
       }
     })();
   </script>

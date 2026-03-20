@@ -1,6 +1,28 @@
 /* ========== ОСНОВНЫЕ НАСТРОЙКИ ========== */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
+
+/* В начало файла, после импорта шрифта */
+html {
+  background: #ffffff;
+  transition: background 0.2s ease;
+}
+
+html.dark-theme {
+  background: #0f0f0f;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #ffffff;
+  color: #1a1a1a;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+body.dark-theme {
+  background: #0f0f0f;
+  color: #e5e7eb;
+}
 /* Используем динамическую высоту для мобильных */
 @supports (height: 100dvh) {
 
@@ -3222,4 +3244,7 @@ input:checked+.slider:before {
     font-size: 1.1rem;
     margin-right: 12px;
   }
+}
+* {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
