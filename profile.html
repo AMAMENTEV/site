@@ -3,6 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script>
+    (function () {
+      // Проверяем localStorage и применяем тему до загрузки CSS
+      const savedTheme = localStorage.getItem('theme');
+      if (savedTheme === 'dark') {
+        document.documentElement.style.backgroundColor = '#0f0f0f';
+        document.body.style.backgroundColor = '#0f0f0f';
+      }
+    })();
+  </script>
   <title>Мой профиль</title>
 <!-- Для profile.html -->
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👤</text></svg>">
@@ -17,7 +27,7 @@
       <a href="messenger.html" class="back-btn"><</a>
       <button onclick="logout()" class="logout-small-header">Выйти</button>
     </div>
-    
+
     <div class="profile-two-columns">
       <!-- Левая колонка - информация о пользователе -->
       <div class="profile-left">
@@ -27,7 +37,7 @@
               <div class="skeleton-circle"></div>
             </div>
           </div>
-          
+
           <div class="profile-info" id="profileInfo">
             <div class="skeleton-line"></div>
             <div class="skeleton-line"></div>
@@ -35,14 +45,14 @@
           </div>
         </div>
       </div>
-      
+
       <!-- Правая колонка - посты -->
       <div class="profile-right">
         <div class="posts-header">
           <h2>Мои посты</h2>
           <button onclick="showCreatePostModal()" class="create-post-btn">+ Новый пост</button>
         </div>
-        
+
         <div class="posts-container" id="postsContainer">
           <div class="skeleton-post"></div>
           <div class="skeleton-post"></div>
@@ -97,9 +107,9 @@
     window.location.href = 'index.html';
     return;
   }
-  
+
   currentUser = user;
-  
+
   // Проверяем кэш
   if (userCache.has(user.uid)) {
     currentUserData = userCache.get(user.uid);
@@ -108,28 +118,28 @@
     listenForNewPosts();
     return;
   }
-  
+
   try {
     // Загружаем только данные пользователя
     const userDoc = await db.collection('users').doc(user.uid).get();
-    
+
     if (!userDoc.exists) {
       window.location.reload();
       return;
     }
-    
+
     currentUserData = userDoc.data();
     userCache.set(user.uid, currentUserData);
-    
+
     // Обновляем аватар
-    document.getElementById('profileAvatar').innerHTML = 
+    document.getElementById('profileAvatar').innerHTML =
       currentUserData.nickname ? currentUserData.nickname.charAt(0).toUpperCase() : '?';
-    
+
     loadProfileInfo();
-    
+
     // Запускаем слушатель для постов (он сам загрузит все посты)
     listenForNewPosts();
-    
+
   } catch (error) {
     console.error('Ошибка загрузки профиля:', error);
     document.getElementById('profileInfo').innerHTML = '<div class="error">Ошибка загрузки профиля</div>';
@@ -138,20 +148,20 @@
 
     function loadProfileInfo() {
       const profileInfo = document.getElementById('profileInfo');
-      
+
       profileInfo.innerHTML = `
         <div class="info-row">
           <label>Никнейм:</label>
           <span id="nickname">${currentUserData.nickname || 'Не указан'}</span>
           <button onclick="editNickname()" class="edit-btn">✎</button>
         </div>
-        
+
         <div class="info-row">
           <label>Тег:</label>
           <span id="tag">${currentUserData.tag || 'Не указан'}</span>
           <button onclick="editTag()" class="edit-btn">✎</button>
         </div>
-        
+
         <div class="info-row">
           <label>Email:</label>
           <span>${currentUserData.email}</span>
@@ -162,7 +172,7 @@
     function displayPosts(snapshot) {
       const postsContainer = document.getElementById('postsContainer');
       let postsHTML = '';
-      
+
       snapshot.forEach(doc => {
         const post = doc.data();
         let date = 'Только что';
@@ -173,7 +183,7 @@
             date = 'Только что';
           }
         }
-        
+
         postsHTML += `
           <div class="post-card" id="post-${doc.id}">
             <div class="post-header">
@@ -184,7 +194,7 @@
           </div>
         `;
       });
-      
+
       postsContainer.innerHTML = postsHTML;
     }
 
@@ -192,22 +202,22 @@
   if (unsubscribePosts) {
     unsubscribePosts();
   }
-  
+
   // Слушаем ВСЕ посты пользователя, без ограничения по времени
   unsubscribePosts = db.collection('posts')
     .where('userId', '==', currentUser.uid)
     .orderBy('createdAt', 'desc')
     .onSnapshot(snapshot => {
-      
+
       const postsContainer = document.getElementById('postsContainer');
-      
+
       if (snapshot.empty) {
         postsContainer.innerHTML = '<div class="no-posts">У вас пока нет постов. Создайте первый!</div>';
         return;
       }
-      
+
       let postsHTML = '';
-      
+
       snapshot.forEach(doc => {
         const post = doc.data();
         let date = 'Только что';
@@ -218,7 +228,7 @@
             date = 'Только что';
           }
         }
-        
+
         postsHTML += `
           <div class="post-card" id="post-${doc.id}">
             <div class="post-header">
@@ -229,9 +239,9 @@
           </div>
         `;
       });
-      
+
       postsContainer.innerHTML = postsHTML;
-      
+
     }, error => {
       console.error('Ошибка в слушателе постов:', error);
     });
@@ -244,7 +254,7 @@
       const current = span.textContent;
       span.innerHTML = `<input type="text" id="editNickname" value="${current}" class="edit-input">`;
       changes.nickname = true;
-      
+
       if (!document.getElementById('saveProfileBtn')) {
         const saveBtn = document.createElement('button');
         saveBtn.id = 'saveProfileBtn';
@@ -260,7 +270,7 @@
       const current = span.textContent;
       span.innerHTML = `<input type="text" id="editTag" value="${current}" placeholder="@tag" class="edit-input">`;
       changes.tag = true;
-      
+
       if (!document.getElementById('saveProfileBtn')) {
         const saveBtn = document.createElement('button');
         saveBtn.id = 'saveProfileBtn';
@@ -275,29 +285,29 @@
       const user = auth.currentUser;
       const messageDiv = document.createElement('div');
       messageDiv.className = 'message';
-      
+
       const updates = {};
       if (changes.nickname) updates.nickname = document.getElementById('editNickname').value;
       if (changes.tag) updates.tag = document.getElementById('editTag').value;
-      
+
       try {
         await db.collection('users').doc(user.uid).update(updates);
-        
+
         const newDisplayName = `${updates.nickname || currentUserData.nickname}|${updates.tag || currentUserData.tag}`;
         await user.updateProfile({ displayName: newDisplayName });
-        
+
         // Обновляем кэш
         currentUserData = { ...currentUserData, ...updates };
         userCache.set(user.uid, currentUserData);
-        
+
         messageDiv.innerHTML = '<div class="success">Изменения сохранены!</div>';
         document.querySelector('.profile-left').appendChild(messageDiv);
-        
+
         document.getElementById('saveProfileBtn')?.remove();
         changes = {};
-        
+
         setTimeout(() => messageDiv.remove(), 2000);
-        
+
       } catch (error) {
         console.error('Ошибка сохранения:', error);
         messageDiv.innerHTML = '<div class="error">Ошибка при сохранении</div>';
@@ -318,20 +328,20 @@
     async function createPost() {
   // Блокируем повторные нажатия
   if (isSubmitting) return;
-  
+
   const content = document.getElementById('postContent').value.trim();
-  
+
   if (!content) {
     alert('Введите текст поста');
     return;
   }
-  
+
   // Скрываем модалку СРАЗУ
   hideCreatePostModal();
-  
+
   // Блокируем кнопку
   isSubmitting = true;
-  
+
   try {
     await db.collection('posts').add({
       userId: currentUser.uid,
@@ -340,9 +350,9 @@
       content: content,
       createdAt: firebase.firestore.FieldValue.serverTimestamp()
     });
-    
+
     // Пост появится автоматически через слушатель listenForNewPosts()
-    
+
   } catch (error) {
     console.error('Ошибка создания поста:', error);
     alert('Ошибка при создании поста');
@@ -356,7 +366,7 @@
 
     async function deletePost(postId) {
   if (!confirm('Удалить этот пост?')) return;
-  
+
   try {
     await db.collection('posts').doc(postId).delete();
     // Пост удалится автоматически через слушатель listenForNewPosts()

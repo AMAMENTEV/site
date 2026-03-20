@@ -3,9 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
+  <script>
+    (function () {
+      // Проверяем localStorage и применяем тему до загрузки CSS
+      const savedTheme = localStorage.getItem('theme');
+      if (savedTheme === 'dark') {
+        document.documentElement.style.backgroundColor = '#0f0f0f';
+        document.body.style.backgroundColor = '#0f0f0f';
+      }
+    })();
+  </script>
   <title>Настройки</title>
-<!-- Для settings.html -->
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚙️</text></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚙️</text></svg>">
   <link rel="stylesheet" href="style.css">
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
@@ -16,28 +25,74 @@
     <div class="settings-header">
       <a href="messenger.html" class="back-btn"><</a>
       <h1>Настройки</h1>
-      <div style="width: 52px;"></div>
+      <div style="width: 44px;"></div>
     </div>
-    
+
     <div class="settings-content">
-      <div class="settings-section">
-        <h2>Тема оформления</h2>
-        <div class="theme-selector">
-          <div class="theme-option" onclick="setTheme('light')">
-            <div class="theme-preview light-preview"></div>
-            <span>Светлая</span>
-            <span class="theme-check" id="check-light">✓</span>
-          </div>
-          <div class="theme-option" onclick="setTheme('dark')">
-            <div class="theme-preview dark-preview"></div>
-            <span>Темная</span>
-            <span class="theme-check" id="check-dark">✓</span>
-          </div>
+      <!-- Карточка пользователя -->
+      <div class="user-card" id="userCard">
+        <div class="user-avatar" id="userAvatar">?</div>
+        <div class="user-info">
+          <div class="user-name" id="userName">Загрузка...</div>
+          <div class="user-tag" id="userTag">@loading</div>
         </div>
       </div>
-      
+
+      <!-- Секция настроек -->
       <div class="settings-section">
-        <button onclick="logout()" class="settings-logout-btn">Выйти из аккаунта</button>
+        <div class="settings-item" onclick="window.location.href='profile.html'">
+          <div class="settings-item-icon">👤</div>
+          <div class="settings-item-info">
+            <div class="settings-item-title">Профиль</div>
+            <div class="settings-item-desc">Изменить имя, тег и другую информацию</div>
+          </div>
+          <div class="settings-item-arrow">→</div>
+        </div>
+
+        <div class="settings-item" onclick="window.location.href='change-password.html'">
+          <div class="settings-item-icon">🔒</div>
+          <div class="settings-item-info">
+            <div class="settings-item-title">Пароль</div>
+            <div class="settings-item-desc">Изменить пароль аккаунта</div>
+          </div>
+          <div class="settings-item-arrow">→</div>
+        </div>
+
+        <div class="settings-item">
+          <div class="settings-item-icon">🌙</div>
+          <div class="settings-item-info">
+            <div class="settings-item-title">Темная тема</div>
+            <div class="settings-item-desc">Использовать темную тему оформления</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="darkThemeToggle" onchange="toggleTheme(this.checked)">
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-item" onclick="window.location.href='help.html'">
+          <div class="settings-item-icon">❓</div>
+          <div class="settings-item-info">
+            <div class="settings-item-title">Помощь / FAQ</div>
+            <div class="settings-item-desc">Ответы на частые вопросы</div>
+          </div>
+          <div class="settings-item-arrow">→</div>
+        </div>
+
+        <div class="settings-item" onclick="window.location.href='about.html'">
+          <div class="settings-item-icon">ℹ️</div>
+          <div class="settings-item-info">
+            <div class="settings-item-title">О приложении</div>
+            <div class="settings-item-desc">Версия и информация</div>
+          </div>
+          <div class="settings-item-arrow">→</div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <button onclick="logout()" class="settings-danger-btn">Выйти из аккаунта</button>
       </div>
     </div>
   </div>
@@ -47,23 +102,53 @@
     let currentUser = null;
     let currentUserData = null;
 
+    // Применяем тему сразу при загрузке страницы (из localStorage)
+    function applyThemeFromLocalStorage() {
+      const savedTheme = localStorage.getItem('theme');
+      if (savedTheme === 'dark') {
+        document.body.classList.add('dark-theme');
+        document.body.classList.remove('light-theme');
+        const toggle = document.getElementById('darkThemeToggle');
+        if (toggle) toggle.checked = true;
+      } else {
+        document.body.classList.add('light-theme');
+        document.body.classList.remove('dark-theme');
+      }
+    }
+
+    // Вызываем сразу
+    applyThemeFromLocalStorage();
+
     auth.onAuthStateChanged(async (user) => {
       if (!user || !user.emailVerified) {
         window.location.href = 'index.html';
         return;
       }
-      
+
       currentUser = user;
-      
+
       try {
         const userDoc = await db.collection('users').doc(user.uid).get();
         if (userDoc.exists) {
           currentUserData = userDoc.data();
-          
-          // Устанавливаем тему из настроек пользователя
-          if (currentUserData.theme) {
-            document.body.classList.add(`${currentUserData.theme}-theme`);
-            updateThemeCheck(currentUserData.theme);
+
+          // Обновляем карточку пользователя
+          document.getElementById('userAvatar').textContent =
+            currentUserData.nickname ? currentUserData.nickname.charAt(0).toUpperCase() : '?';
+          document.getElementById('userName').textContent = currentUserData.nickname || 'Пользователь';
+          document.getElementById('userTag').textContent = currentUserData.tag || '@user';
+
+          // Устанавливаем тему из базы
+          if (currentUserData.theme === 'dark') {
+            document.body.classList.add('dark-theme');
+            document.body.classList.remove('light-theme');
+            document.getElementById('darkThemeToggle').checked = true;
+            localStorage.setItem('theme', 'dark');
+          } else {
+            document.body.classList.add('light-theme');
+            document.body.classList.remove('dark-theme');
+            document.getElementById('darkThemeToggle').checked = false;
+            localStorage.setItem('theme', 'light');
           }
         }
       } catch (error) {
@@ -71,27 +156,30 @@
       }
     });
 
-    function updateThemeCheck(theme) {
-      document.getElementById('check-light').style.opacity = theme === 'light' ? '1' : '0';
-      document.getElementById('check-dark').style.opacity = theme === 'dark' ? '1' : '0';
-    }
+    async function toggleTheme(isDark) {
+      const theme = isDark ? 'dark' : 'light';
 
-    async function setTheme(theme) {
-      if (!currentUser) return;
-      
-      try {
-        await db.collection('users').doc(currentUser.uid).update({
-          theme: theme
-        });
-        
-        // Обновляем класс на body
-        document.body.classList.remove('light-theme', 'dark-theme');
-        document.body.classList.add(`${theme}-theme`);
-        
-        updateThemeCheck(theme);
-        
-      } catch (error) {
-        console.error('Ошибка сохранения темы:', error);
+      // Мгновенно применяем тему на странице
+      if (isDark) {
+        document.body.classList.add('dark-theme');
+        document.body.classList.remove('light-theme');
+      } else {
+        document.body.classList.add('light-theme');
+        document.body.classList.remove('dark-theme');
+      }
+
+      // Сохраняем в localStorage для быстрой загрузки
+      localStorage.setItem('theme', theme);
+
+      // Сохраняем в Firebase
+      if (currentUser) {
+        try {
+          await db.collection('users').doc(currentUser.uid).update({
+            theme: theme
+          });
+        } catch (error) {
+          console.error('Ошибка сохранения темы:', error);
+        }
       }
     }
 
