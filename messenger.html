@@ -1,8 +1,10 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
   <script>
     (function () {
       const savedTheme = localStorage.getItem('theme');
@@ -20,8 +22,9 @@
     })();
   </script>
   <title>Мессенджер</title>
-<!-- Для messenger.html -->
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💬</text></svg>">
+  <!-- Для messenger.html -->
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💬</text></svg>">
   <link rel="stylesheet" href="style.css">
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
@@ -43,6 +46,12 @@
 
     .message.system .message-time {
       display: none !important;
+    }
+
+    /* Темная тема для системных сообщений */
+    body.dark-theme .message.system {
+      background: #2d2d2d !important;
+      color: #9ca3af !important;
     }
 
     /* Исправление для мобильной версии */
@@ -79,64 +88,15 @@
       .message-input-area {
         padding-bottom: max(12px, env(safe-area-inset-bottom, 12px));
       }
+    }
 
-      /* Нижняя навигация для мобилок */
-      .mobile-nav-bar {
-        display: flex;
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        height: 70px;
-        background: var(--bg-primary);
-        border-top: 1px solid var(--border-color);
-        justify-content: space-around;
-        align-items: center;
-        padding: 0 10px;
-        padding-bottom: env(safe-area-inset-bottom, 0);
-        z-index: 1000;
-      }
-
-      .mobile-nav-item {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 4px;
-        color: var(--text-secondary);
-        text-decoration: none;
-        font-size: 0.7rem;
-        padding: 8px;
-        border-radius: 12px;
-        transition: all 0.2s;
-        background: none;
-        border: none;
-        cursor: pointer;
-        width: 60px;
-      }
-
-      .mobile-nav-item.active {
-        color: var(--accent-color);
-      }
-
-      .mobile-nav-item span {
-        font-size: 1.3rem;
-      }
-
-      .mobile-menu-btn {
-        display: none !important;
-      }
-
-      .mobile-popup-menu {
-        display: none !important;
-      }
-
-      .sidebar-overlay {
-        display: none !important;
-      }
+    /* Кнопка настроек в мобильном меню */
+    .popup-item.settings {
+      border-bottom: 1px solid var(--border-color);
     }
   </style>
 </head>
+
 <body>
   <div class="messenger-container">
     <!-- Первая колонка - навигация (десктоп) -->
@@ -194,30 +154,21 @@
       <div class="messages-container" id="messagesContainer"></div>
 
       <div class="message-input-area" id="messageInputArea" style="display: none;">
-        <input type="text" id="messageInput" placeholder="Введите сообщение..." onkeypress="if(event.key==='Enter') sendMessage()">
+        <input type="text" id="messageInput" placeholder="Введите сообщение..."
+          onkeypress="if(event.key==='Enter') sendMessage()">
         <button onclick="sendMessage()" id="sendButton">→</button>
       </div>
     </div>
   </div>
 
-  <!-- Мобильная нижняя навигация -->
-  <div class="mobile-nav-bar">
-    <a href="profile.html" class="mobile-nav-item" id="mobile-profile">
-      <span>👤</span>
-      <span>Профиль</span>
-    </a>
-    <a href="messenger.html" class="mobile-nav-item active" id="mobile-messenger">
-      <span>💬</span>
-      <span>Чаты</span>
-    </a>
-    <a href="settings.html" class="mobile-nav-item" id="mobile-settings">
-      <span>⚙️</span>
-      <span>Настройки</span>
-    </a>
-    <button onclick="showCreateGroupModal()" class="mobile-nav-item" id="mobile-new-chat">
-      <span>+</span>
-      <span>Новый</span>
-    </button>
+  <!-- Мобильное меню (бургер) -->
+  <button class="mobile-menu-btn" id="mobileMenuBtn" onclick="toggleMobileMenu()">☰</button>
+  <div class="sidebar-overlay" id="mobileMenuOverlay" onclick="toggleMobileMenu()"></div>
+  <div class="mobile-popup-menu" id="mobilePopupMenu">
+    <a href="profile.html" class="popup-item">👤 Мой профиль</a>
+    <a href="settings.html" class="popup-item settings">⚙️ Настройки</a>
+    <button onclick="showCreateGroupModal(); toggleMobileMenu()" class="popup-item">+ Новая беседа</button>
+    <button onclick="logout()" class="popup-item logout">🚪 Выйти</button>
   </div>
 
   <!-- Модальное окно для создания беседы -->
@@ -231,7 +182,8 @@
         <input type="text" id="groupName" placeholder="Название беседы" class="modal-input">
         <div class="group-participants">
           <h4>Выберите участников:</h4>
-          <input type="text" id="searchUsersInCreate" placeholder="Поиск пользователей..." class="search-input" onkeyup="searchUsersInCreate()">
+          <input type="text" id="searchUsersInCreate" placeholder="Поиск пользователей..." class="search-input"
+            onkeyup="searchUsersInCreate()">
           <div id="usersListModal" class="users-checkbox-list">
             <div class="no-users">Начните вводить имя для поиска</div>
           </div>
@@ -255,15 +207,18 @@
         <div class="group-info-section">
           <h4>Участники:</h4>
           <div id="groupParticipants" class="group-participants-list"></div>
-          <button onclick="leaveCurrentGroup()" id="leaveGroupBtn" class="modal-leave-btn" style="margin-top: 10px; width: 100%;">Покинуть беседу</button>
+          <button onclick="leaveCurrentGroup()" id="leaveGroupBtn" class="modal-leave-btn"
+            style="margin-top: 10px; width: 100%;">Покинуть беседу</button>
         </div>
         <div class="group-info-section">
           <h4>Добавить участников:</h4>
-          <input type="text" id="searchUsersToAdd" placeholder="Поиск пользователей..." class="search-input" onkeyup="searchUsersToAdd()">
+          <input type="text" id="searchUsersToAdd" placeholder="Поиск пользователей..." class="search-input"
+            onkeyup="searchUsersToAdd()">
           <div id="addParticipantsList" class="users-checkbox-list">
             <div class="no-users">Начните вводить имя для поиска</div>
           </div>
-          <button onclick="addSelectedParticipants()" class="modal-save-btn" style="margin-top: 10px; width: 100%;">Добавить выбранных</button>
+          <button onclick="addSelectedParticipants()" class="modal-save-btn"
+            style="margin-top: 10px; width: 100%;">Добавить выбранных</button>
         </div>
       </div>
       <div class="modal-footer">
@@ -282,7 +237,8 @@
       </div>
       <div class="modal-body">
         <button onclick="deleteMessageForMe()" class="modal-option-btn">Удалить у себя</button>
-        <button onclick="deleteMessageForEveryone()" id="deleteForEveryoneBtn" class="modal-option-btn delete">Удалить у всех</button>
+        <button onclick="deleteMessageForEveryone()" id="deleteForEveryoneBtn" class="modal-option-btn delete">Удалить у
+          всех</button>
       </div>
       <div class="modal-footer">
         <button onclick="hideMessageOptions()" class="modal-cancel-btn">Отмена</button>
@@ -324,26 +280,22 @@
         if (userDoc.exists) {
           currentUserData = userDoc.data();
 
-        // Удалите или закомментируйте этот блок:
-          // if (currentUserData.theme) {
-          //   document.body.classList.add(`${currentUserData.theme}-theme`);
-          // } else {
-          //   document.body.classList.add('light-theme');
-          // }
-
-          // Вместо этого добавьте проверку:
+          // Применяем тему из настроек пользователя
           if (currentUserData && currentUserData.theme) {
             const currentTheme = document.body.classList.contains('dark-theme') ? 'dark' : 'light';
             if (currentUserData.theme !== currentTheme) {
               if (currentUserData.theme === 'dark') {
                 document.body.classList.add('dark-theme');
                 document.body.classList.remove('light-theme');
+                localStorage.setItem('theme', 'dark');
               } else {
                 document.body.classList.add('light-theme');
                 document.body.classList.remove('dark-theme');
+                localStorage.setItem('theme', 'light');
               }
             }
           }
+        }
       } catch (error) {
         console.error('Ошибка загрузки пользователя:', error);
       }
@@ -444,7 +396,7 @@
                 const msg = msgDoc.data();
                 hasAnyMessage = true;
                 if (!msg.deletedFor ||
-                    (!msg.deletedFor.includes('everyone') && !msg.deletedFor.includes(currentUser.uid))) {
+                  (!msg.deletedFor.includes('everyone') && !msg.deletedFor.includes(currentUser.uid))) {
                   lastMessage = msg.text;
                   lastMessageTime = msg.timestamp ? msg.timestamp.toDate?.() || new Date(msg.timestamp) : lastMessageTime;
                   break;
@@ -462,62 +414,56 @@
               }
 
               // Считаем непрочитанные
-              const unreadQuery = await db.collection('chats').doc(doc.id)
-                .collection('messages')
-                .where('read', '==', false)
-                .get();
+              let unreadCount = 0;
 
-              // Считаем непрочитанные
-let unreadCount = 0;
+              if (chat.isGroup) {
+                // Для групповых чатов - получаем последние 50 сообщений и проверяем readBy
+                const messagesSnapshot = await db.collection('chats').doc(doc.id)
+                  .collection('messages')
+                  .orderBy('timestamp', 'desc')
+                  .limit(50)
+                  .get();
 
-if (chat.isGroup) {
-  // Для групповых чатов - получаем последние 50 сообщений и проверяем readBy
-  const messagesSnapshot = await db.collection('chats').doc(doc.id)
-    .collection('messages')
-    .orderBy('timestamp', 'desc')
-    .limit(50)
-    .get();
+                messagesSnapshot.forEach(msgDoc => {
+                  const msg = msgDoc.data();
 
-  messagesSnapshot.forEach(msgDoc => {
-    const msg = msgDoc.data();
+                  // Пропускаем удаленные
+                  if (msg.deletedFor) {
+                    if (msg.deletedFor.includes('everyone') || msg.deletedFor.includes(currentUser.uid)) {
+                      return;
+                    }
+                  }
 
-    // Пропускаем удаленные
-    if (msg.deletedFor) {
-      if (msg.deletedFor.includes('everyone') || msg.deletedFor.includes(currentUser.uid)) {
-        return;
-      }
-    }
+                  // Пропускаем системные
+                  if (msg.isSystem) return;
 
-    // Пропускаем системные
-    if (msg.isSystem) return;
+                  // Непрочитанным считается сообщение не от текущего пользователя,
+                  // в котором нет его UID в readBy
+                  if (msg.senderId !== currentUser.uid) {
+                    if (!msg.readBy || !msg.readBy.includes(currentUser.uid)) {
+                      unreadCount++;
+                    }
+                  }
+                });
+              } else {
+                // Для личных чатов - старая логика
+                const unreadQuery = await db.collection('chats').doc(doc.id)
+                  .collection('messages')
+                  .where('read', '==', false)
+                  .get();
 
-    // Непрочитанным считается сообщение не от текущего пользователя,
-    // в котором нет его UID в readBy
-    if (msg.senderId !== currentUser.uid) {
-      if (!msg.readBy || !msg.readBy.includes(currentUser.uid)) {
-        unreadCount++;
-      }
-    }
-  });
-} else {
-  // Для личных чатов - старая логика
-  const unreadQuery = await db.collection('chats').doc(doc.id)
-    .collection('messages')
-    .where('read', '==', false)
-    .get();
-
-  unreadQuery.forEach(msgDoc => {
-    const msg = msgDoc.data();
-    if (msg.deletedFor) {
-      if (msg.deletedFor.includes('everyone') || msg.deletedFor.includes(currentUser.uid)) {
-        return;
-      }
-    }
-    if (msg.receiverId === currentUser.uid) {
-      unreadCount++;
-    }
-  });
-}
+                unreadQuery.forEach(msgDoc => {
+                  const msg = msgDoc.data();
+                  if (msg.deletedFor) {
+                    if (msg.deletedFor.includes('everyone') || msg.deletedFor.includes(currentUser.uid)) {
+                      return;
+                    }
+                  }
+                  if (msg.receiverId === currentUser.uid) {
+                    unreadCount++;
+                  }
+                });
+              }
 
               newUnreadCounts[doc.id] = unreadCount;
 
@@ -528,7 +474,7 @@ if (chat.isGroup) {
                 displayAvatar: chatAvatar,
                 lastMessage: lastMessage,
                 lastMessageTime: lastMessageTime,
-                createdAt: createdAt // Добавляем дату создания для сортировки новых бесед
+                createdAt: createdAt
               });
             })();
 
@@ -769,8 +715,6 @@ if (chat.isGroup) {
           };
           selectChat(chat);
         } else {
-          // Создаем чат, он появится в списке сразу (даже без сообщений)
-          // благодаря использованию createdAt для сортировки
           const newChatRef = await db.collection('chats').add({
             participants: [currentUser.uid, userId],
             isGroup: false,
@@ -779,7 +723,6 @@ if (chat.isGroup) {
             lastMessageTime: null
           });
 
-          // Сразу открываем чат
           const chat = {
             id: newChatRef.id,
             participants: [currentUser.uid, userId],
@@ -796,399 +739,348 @@ if (chat.isGroup) {
       }
     }
 
-    // ---------- ИСПРАВЛЕННЫЙ выбор чата ----------
-function selectChat(chat) {
-  console.log('Selecting chat:', chat);
+    // ---------- Выбор чата ----------
+    function selectChat(chat) {
+      console.log('Selecting chat:', chat);
 
-  // Сначала очищаем предыдущий чат
-  if (unsubscribeMessages) {
-    unsubscribeMessages();
-    unsubscribeMessages = null;
-  }
-
-  // Очищаем контейнер сообщений сразу
-  const messagesContainer = document.getElementById('messagesContainer');
-  messagesContainer.innerHTML = '<div class="loading">Загрузка сообщений...</div>';
-
-  // Обновляем выбранный чат
-  selectedChat = chat;
-  currentChatId = chat.id;
-
-  // Обновляем шапку
-  const chatHeader = document.getElementById('chatHeader');
-
-  let headerContent = '';
-  if (chat.isGroup) {
-    const participantsCount = chat.participants ? chat.participants.length : 2;
-    headerContent = `
-      <div class="selected-chat" onclick="openChatInfo('${chat.id}')">
-        <button class="mobile-back-btn" onclick="event.stopPropagation(); exitChatMode()"><</button>
-        <div class="chat-avatar-placeholder large">👥 ${chat.displayName.charAt(0).toUpperCase()}</div>
-        <div class="chat-info">
-          <h3>${chat.displayName}</h3>
-          <p>${participantsCount} участников</p>
-        </div>
-      </div>
-    `;
-  } else {
-    const otherUserId = chat.participants.find(id => id !== currentUser.uid);
-    headerContent = `
-      <div class="selected-chat" onclick="openUserProfile('${otherUserId}')">
-        <button class="mobile-back-btn" onclick="event.stopPropagation(); exitChatMode()"><</button>
-        <div class="chat-avatar-placeholder large">${chat.displayName.charAt(0).toUpperCase()}</div>
-        <div class="chat-info">
-          <h3>${chat.displayName}</h3>
-          <p>${chat.displayAvatar}</p>
-        </div>
-      </div>
-    `;
-  }
-
-  chatHeader.innerHTML = headerContent;
-  document.getElementById('messageInputArea').style.display = 'flex';
-
-  if (window.innerWidth <= 768) {
-    enterChatMode();
-  }
-
-  // Загружаем сообщения
-  loadMessages();
-
-  if (unreadCounts[chat.id] > 0) {
-    markMessagesAsRead(chat.id);
-  }
-}
-
-    // ---------- Отметить сообщения как прочитанные (только для личных чатов) ----------
-async function markMessagesAsRead(chatId) {
-  // Для групповых чатов ничего не делаем - они отмечаются в loadMessages
-  if (selectedChat && selectedChat.isGroup) {
-    return;
-  }
-
-  try {
-    const unreadSnapshot = await db.collection('chats').doc(chatId)
-      .collection('messages')
-      .where('read', '==', false)
-      .get();
-
-    if (unreadSnapshot.empty) return;
-
-    const batch = db.batch();
-    unreadSnapshot.forEach(doc => {
-      const msg = doc.data();
-      if (msg.receiverId === currentUser.uid) {
-        batch.update(doc.ref, { read: true });
-      }
-    });
-
-    await batch.commit();
-
-    // Обновляем счетчик в памяти
-    unreadCounts[chatId] = 0;
-
-    // Обновляем UI
-    const chatElement = document.querySelector(`.chat-item[onclick*='${chatId}']`);
-    if (chatElement) {
-      chatElement.classList.remove('has-unread');
-      const nameElement = chatElement.querySelector('.chat-name');
-      if (nameElement) {
-        const badge = nameElement.querySelector('.unread-badge');
-        if (badge) {
-          badge.remove();
-        }
-      }
-    }
-
-  } catch (error) {
-    console.error('Ошибка при отметке сообщений как прочитанных:', error);
-  }
-}
-
-  // ---------- ЗАГРУЗКА СООБЩЕНИЙ (ОДИН РАЗ) ----------
-async function loadMessages() {
-  if (!currentChatId || !selectedChat) {
-    console.log('loadMessages: нет активного чата, выходим');
-    return;
-  }
-
-  const messagesContainer = document.getElementById('messagesContainer');
-
-  if (unsubscribeMessages) {
-    unsubscribeMessages();
-    unsubscribeMessages = null;
-  }
-
-  messagesContainer.innerHTML = '<div class="loading">Загрузка сообщений...</div>';
-
-  try {
-    // Загружаем сообщения один раз
-    const snapshot = await db.collection('chats').doc(currentChatId)
-      .collection('messages')
-      .orderBy('timestamp', 'asc')
-      .get();
-
-    if (snapshot.empty) {
-      messagesContainer.innerHTML = '<div class="no-messages">Нет сообщений. Напишите что-нибудь!</div>';
-      return;
-    }
-
-    // Собираем ID всех отправителей для группового чата
-    const senderIds = new Set();
-    snapshot.forEach(doc => {
-      const msg = doc.data();
-      if (!msg.isSystem && selectedChat.isGroup && msg.senderId !== currentUser.uid) {
-        senderIds.add(msg.senderId);
-      }
-    });
-
-    // Загружаем отправителей
-    const senderCache = {};
-    if (senderIds.size > 0) {
-      const userIds = Array.from(senderIds);
-      for (let i = 0; i < userIds.length; i += 10) {
-        const batch = userIds.slice(i, i + 10);
-        const usersSnapshot = await db.collection('users')
-          .where('__name__', 'in', batch)
-          .get();
-
-        usersSnapshot.forEach(doc => {
-          senderCache[doc.id] = doc.data();
-        });
-      }
-    }
-
-    // Отмечаем сообщения как прочитанные (ТОЛЬКО У СЕБЯ)
-    const batch = db.batch();
-    let hasUnread = false;
-
-    snapshot.forEach(doc => {
-      const msg = doc.data();
-
-      // Для групповых чатов
-      if (selectedChat.isGroup) {
-        if (msg.senderId !== currentUser.uid && !msg.isSystem) {
-          if (!msg.readBy || !msg.readBy.includes(currentUser.uid)) {
-            hasUnread = true;
-            batch.update(doc.ref, {
-              readBy: firebase.firestore.FieldValue.arrayUnion(currentUser.uid)
-            });
-          }
-        }
-      }
-      // Для личных чатов
-      else {
-        if (msg.receiverId === currentUser.uid && !msg.read) {
-          hasUnread = true;
-          batch.update(doc.ref, { read: true });
-        }
-      }
-    });
-
-    if (hasUnread) {
-      await batch.commit();
-
-      // Обновляем счетчик в памяти
-      unreadCounts[currentChatId] = 0;
-
-      // Обновляем UI конкретного чата
-      const chatElement = document.querySelector(`.chat-item[onclick*='${currentChatId}']`);
-      if (chatElement) {
-        chatElement.classList.remove('has-unread');
-        const nameElement = chatElement.querySelector('.chat-name');
-        if (nameElement) {
-          const badge = nameElement.querySelector('.unread-badge');
-          if (badge) {
-            badge.remove();
-          }
-        }
-      }
-    }
-
-    // Генерируем HTML
-    let html = '';
-    let lastDate = '';
-
-    snapshot.forEach(doc => {
-      const msg = doc.data();
-      const isMyMessage = msg.senderId === currentUser.uid;
-
-      let time = '';
-      let messageDate = '';
-      if (msg.timestamp) {
-        const date = msg.timestamp.toDate();
-        time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        messageDate = date.toLocaleDateString();
+      if (unsubscribeMessages) {
+        unsubscribeMessages();
+        unsubscribeMessages = null;
       }
 
-      if (messageDate && messageDate !== lastDate) {
-        html += `<div class="date-separator">${messageDate}</div>`;
-        lastDate = messageDate;
-      }
+      const messagesContainer = document.getElementById('messagesContainer');
+      messagesContainer.innerHTML = '<div class="loading">Загрузка сообщений...</div>';
 
-      // Проверяем удаление
-      if (msg.deletedFor) {
-        if (msg.deletedFor.includes('everyone') ||
-            msg.deletedFor.includes(currentUser.uid)) {
-          return;
-        }
-      }
+      selectedChat = chat;
+      currentChatId = chat.id;
 
-      if (msg.isSystem) {
-        html += `
-          <div class="message system">
-            <div class="message-content">${msg.text}</div>
+      const chatHeader = document.getElementById('chatHeader');
+
+      let headerContent = '';
+      if (chat.isGroup) {
+        const participantsCount = chat.participants ? chat.participants.length : 2;
+        headerContent = `
+          <div class="selected-chat" onclick="openChatInfo('${chat.id}')">
+            <button class="mobile-back-btn" onclick="event.stopPropagation(); exitChatMode()"><</button>
+            <div class="chat-avatar-placeholder large">👥 ${chat.displayName.charAt(0).toUpperCase()}</div>
+            <div class="chat-info">
+              <h3>${chat.displayName}</h3>
+              <p>${participantsCount} участников</p>
+            </div>
           </div>
         `;
+      } else {
+        const otherUserId = chat.participants.find(id => id !== currentUser.uid);
+        headerContent = `
+          <div class="selected-chat" onclick="openUserProfile('${otherUserId}')">
+            <button class="mobile-back-btn" onclick="event.stopPropagation(); exitChatMode()"><</button>
+            <div class="chat-avatar-placeholder large">${chat.displayName.charAt(0).toUpperCase()}</div>
+            <div class="chat-info">
+              <h3>${chat.displayName}</h3>
+              <p>${chat.displayAvatar}</p>
+            </div>
+          </div>
+        `;
+      }
+
+      chatHeader.innerHTML = headerContent;
+      document.getElementById('messageInputArea').style.display = 'flex';
+
+      if (window.innerWidth <= 768) {
+        enterChatMode();
+      }
+
+      loadMessages();
+
+      if (unreadCounts[chat.id] > 0) {
+        markMessagesAsRead(chat.id);
+      }
+    }
+
+    // ---------- Отметить сообщения как прочитанные ----------
+    async function markMessagesAsRead(chatId) {
+      if (selectedChat && selectedChat.isGroup) {
         return;
       }
 
-      let senderInfo = '';
-      if (selectedChat.isGroup && !isMyMessage) {
-        const sender = senderCache[msg.senderId];
-        if (sender) {
-          senderInfo = `<div class="message-sender">${sender.nickname || '?'} ${sender.tag || ''}</div>`;
-        }
+      try {
+        const unreadSnapshot = await db.collection('chats').doc(chatId)
+          .collection('messages')
+          .where('read', '==', false)
+          .get();
+
+        if (unreadSnapshot.empty) return;
+
+        const batch = db.batch();
+        unreadSnapshot.forEach(doc => {
+          const msg = doc.data();
+          if (msg.receiverId === currentUser.uid) {
+            batch.update(doc.ref, { read: true });
+          }
+        });
+
+        await batch.commit();
+        unreadCounts[chatId] = 0;
+
+      } catch (error) {
+        console.error('Ошибка при отметке сообщений как прочитанных:', error);
+      }
+    }
+
+    // ---------- Загрузка сообщений ----------
+    async function loadMessages() {
+      if (!currentChatId || !selectedChat) {
+        console.log('loadMessages: нет активного чата, выходим');
+        return;
       }
 
-      const deleteOption = isMyMessage ?
-        `<button class="message-delete-btn" onclick="showMessageOptions('${doc.id}', event)">⋯</button>` : '';
+      const messagesContainer = document.getElementById('messagesContainer');
 
-      html += `
-        <div class="message ${isMyMessage ? 'my-message' : 'other-message'}" id="msg-${doc.id}">
-          ${deleteOption}
-          ${senderInfo}
-          <div class="message-content">${msg.text.replace(/\n/g, '<br>')}</div>
-          <div class="message-time">${time}</div>
-        </div>
-      `;
-    });
+      if (unsubscribeMessages) {
+        unsubscribeMessages();
+        unsubscribeMessages = null;
+      }
 
-    messagesContainer.innerHTML = html;
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      messagesContainer.innerHTML = '<div class="loading">Загрузка сообщений...</div>';
 
-    // Подписываемся ТОЛЬКО на новые сообщения
-    listenForNewMessages();
+      try {
+        const snapshot = await db.collection('chats').doc(currentChatId)
+          .collection('messages')
+          .orderBy('timestamp', 'asc')
+          .get();
 
-  } catch (error) {
-    console.error('Ошибка загрузки сообщений:', error);
-    messagesContainer.innerHTML = '<div class="error">Ошибка загрузки сообщений</div>';
-  }
-}
+        if (snapshot.empty) {
+          messagesContainer.innerHTML = '<div class="no-messages">Нет сообщений. Напишите что-нибудь!</div>';
+          return;
+        }
 
-// ---------- СЛУШАТЕЛЬ ТОЛЬКО НОВЫХ СООБЩЕНИЙ ----------
-function listenForNewMessages() {
-  if (!currentChatId) return;
+        const senderIds = new Set();
+        snapshot.forEach(doc => {
+          const msg = doc.data();
+          if (!msg.isSystem && selectedChat.isGroup && msg.senderId !== currentUser.uid) {
+            senderIds.add(msg.senderId);
+          }
+        });
 
-  // Отписываемся от старого слушателя
-  if (unsubscribeMessages) {
-    unsubscribeMessages();
-  }
+        const senderCache = {};
+        if (senderIds.size > 0) {
+          const userIds = Array.from(senderIds);
+          for (let i = 0; i < userIds.length; i += 10) {
+            const batch = userIds.slice(i, i + 10);
+            const usersSnapshot = await db.collection('users')
+              .where('__name__', 'in', batch)
+              .get();
 
-  // Слушаем только новые сообщения
-  unsubscribeMessages = db.collection('chats').doc(currentChatId)
-    .collection('messages')
-    .orderBy('timestamp', 'asc')
-    .onSnapshot(async snapshot => {
+            usersSnapshot.forEach(doc => {
+              senderCache[doc.id] = doc.data();
+            });
+          }
+        }
 
-      snapshot.docChanges().forEach(async change => {
-        if (change.type === 'added') {
-          const msg = change.doc.data();
-          const msgId = change.doc.id;
+        const batch = db.batch();
+        let hasUnread = false;
 
-          // Проверяем, нет ли уже такого сообщения
-          if (document.getElementById(`msg-${msgId}`)) return;
+        snapshot.forEach(doc => {
+          const msg = doc.data();
 
-          // Сразу отмечаем как прочитанное (мы же в чате)
           if (selectedChat.isGroup) {
             if (msg.senderId !== currentUser.uid && !msg.isSystem) {
               if (!msg.readBy || !msg.readBy.includes(currentUser.uid)) {
-                await change.doc.ref.update({
+                hasUnread = true;
+                batch.update(doc.ref, {
                   readBy: firebase.firestore.FieldValue.arrayUnion(currentUser.uid)
                 });
               }
             }
           } else {
             if (msg.receiverId === currentUser.uid && !msg.read) {
-              await change.doc.ref.update({ read: true });
+              hasUnread = true;
+              batch.update(doc.ref, { read: true });
+            }
+          }
+        });
+
+        if (hasUnread) {
+          await batch.commit();
+          unreadCounts[currentChatId] = 0;
+        }
+
+        let html = '';
+        let lastDate = '';
+
+        snapshot.forEach(doc => {
+          const msg = doc.data();
+          const isMyMessage = msg.senderId === currentUser.uid;
+
+          let time = '';
+          let messageDate = '';
+          if (msg.timestamp) {
+            const date = msg.timestamp.toDate();
+            time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            messageDate = date.toLocaleDateString();
+          }
+
+          if (messageDate && messageDate !== lastDate) {
+            html += `<div class="date-separator">${messageDate}</div>`;
+            lastDate = messageDate;
+          }
+
+          if (msg.deletedFor) {
+            if (msg.deletedFor.includes('everyone') ||
+              msg.deletedFor.includes(currentUser.uid)) {
+              return;
             }
           }
 
-          // Добавляем сообщение в контейнер
+          if (msg.isSystem) {
+            html += `
+              <div class="message system">
+                <div class="message-content">${msg.text}</div>
+              </div>
+            `;
+            return;
+          }
+
           let senderInfo = '';
-          if (selectedChat.isGroup && msg.senderId !== currentUser.uid && msg.senderId) {
-            const sender = await getUserById(msg.senderId);
+          if (selectedChat.isGroup && !isMyMessage) {
+            const sender = senderCache[msg.senderId];
             if (sender) {
               senderInfo = `<div class="message-sender">${sender.nickname || '?'} ${sender.tag || ''}</div>`;
             }
           }
 
-          const isMyMessage = msg.senderId === currentUser.uid;
-          let time = '';
-          if (msg.timestamp) {
-            const date = msg.timestamp.toDate();
-            time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          }
-
           const deleteOption = isMyMessage ?
-            `<button class="message-delete-btn" onclick="showMessageOptions('${msgId}', event)">⋯</button>` : '';
+            `<button class="message-delete-btn" onclick="showMessageOptions('${doc.id}', event)">⋯</button>` : '';
 
-          const messageHTML = `
-            <div class="message ${isMyMessage ? 'my-message' : 'other-message'}" id="msg-${msgId}">
+          html += `
+            <div class="message ${isMyMessage ? 'my-message' : 'other-message'}" id="msg-${doc.id}">
               ${deleteOption}
               ${senderInfo}
               <div class="message-content">${msg.text.replace(/\n/g, '<br>')}</div>
               <div class="message-time">${time}</div>
             </div>
           `;
+        });
 
-          messagesContainer.insertAdjacentHTML('beforeend', messageHTML);
-          messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
-      });
+        messagesContainer.innerHTML = html;
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
-    }, error => console.error('Ошибка слушателя новых сообщений:', error));
-}
+        listenForNewMessages();
 
-
- // ---------- Отправка сообщения ----------
-async function sendMessage() {
-  const input = document.getElementById('messageInput');
-  const text = input.value.trim();
-  if (!text || !currentChatId || !selectedChat) return;
-
-  input.value = '';
-
-  try {
-    const messageData = {
-      text: text,
-      senderId: currentUser.uid,
-      timestamp: firebase.firestore.FieldValue.serverTimestamp()
-    };
-
-    if (selectedChat.isGroup) {
-      messageData.readBy = [currentUser.uid];
-    } else {
-      const otherUserId = selectedChat.participants.find(id => id !== currentUser.uid);
-      messageData.receiverId = otherUserId;
-      messageData.read = false;
+      } catch (error) {
+        console.error('Ошибка загрузки сообщений:', error);
+        messagesContainer.innerHTML = '<div class="error">Ошибка загрузки сообщений</div>';
+      }
     }
 
-    await db.collection('chats').doc(currentChatId)
-      .collection('messages')
-      .add(messageData);
+    // ---------- Слушатель новых сообщений ----------
+    function listenForNewMessages() {
+      if (!currentChatId) return;
 
-    await db.collection('chats').doc(currentChatId).update({
-      lastMessage: text,
-      lastMessageTime: firebase.firestore.FieldValue.serverTimestamp()
-    });
+      if (unsubscribeMessages) {
+        unsubscribeMessages();
+      }
 
-  } catch (error) {
-    console.error('Ошибка отправки:', error);
-    alert('Ошибка при отправке сообщения');
-    input.value = text;
-  }
-}
+      unsubscribeMessages = db.collection('chats').doc(currentChatId)
+        .collection('messages')
+        .orderBy('timestamp', 'asc')
+        .onSnapshot(async snapshot => {
+
+          snapshot.docChanges().forEach(async change => {
+            if (change.type === 'added') {
+              const msg = change.doc.data();
+              const msgId = change.doc.id;
+
+              if (document.getElementById(`msg-${msgId}`)) return;
+
+              if (selectedChat.isGroup) {
+                if (msg.senderId !== currentUser.uid && !msg.isSystem) {
+                  if (!msg.readBy || !msg.readBy.includes(currentUser.uid)) {
+                    await change.doc.ref.update({
+                      readBy: firebase.firestore.FieldValue.arrayUnion(currentUser.uid)
+                    });
+                  }
+                }
+              } else {
+                if (msg.receiverId === currentUser.uid && !msg.read) {
+                  await change.doc.ref.update({ read: true });
+                }
+              }
+
+              let senderInfo = '';
+              if (selectedChat.isGroup && msg.senderId !== currentUser.uid && msg.senderId) {
+                const sender = await getUserById(msg.senderId);
+                if (sender) {
+                  senderInfo = `<div class="message-sender">${sender.nickname || '?'} ${sender.tag || ''}</div>`;
+                }
+              }
+
+              const isMyMessage = msg.senderId === currentUser.uid;
+              let time = '';
+              if (msg.timestamp) {
+                const date = msg.timestamp.toDate();
+                time = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+              }
+
+              const deleteOption = isMyMessage ?
+                `<button class="message-delete-btn" onclick="showMessageOptions('${msgId}', event)">⋯</button>` : '';
+
+              const messageHTML = `
+                <div class="message ${isMyMessage ? 'my-message' : 'other-message'}" id="msg-${msgId}">
+                  ${deleteOption}
+                  ${senderInfo}
+                  <div class="message-content">${msg.text.replace(/\n/g, '<br>')}</div>
+                  <div class="message-time">${time}</div>
+                </div>
+              `;
+
+              const messagesContainer = document.getElementById('messagesContainer');
+              messagesContainer.insertAdjacentHTML('beforeend', messageHTML);
+              messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+          });
+
+        }, error => console.error('Ошибка слушателя новых сообщений:', error));
+    }
+
+    // ---------- Отправка сообщения ----------
+    async function sendMessage() {
+      const input = document.getElementById('messageInput');
+      const text = input.value.trim();
+      if (!text || !currentChatId || !selectedChat) return;
+
+      input.value = '';
+
+      try {
+        const messageData = {
+          text: text,
+          senderId: currentUser.uid,
+          timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        if (selectedChat.isGroup) {
+          messageData.readBy = [currentUser.uid];
+        } else {
+          const otherUserId = selectedChat.participants.find(id => id !== currentUser.uid);
+          messageData.receiverId = otherUserId;
+          messageData.read = false;
+        }
+
+        await db.collection('chats').doc(currentChatId)
+          .collection('messages')
+          .add(messageData);
+
+        await db.collection('chats').doc(currentChatId).update({
+          lastMessage: text,
+          lastMessageTime: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+      } catch (error) {
+        console.error('Ошибка отправки:', error);
+        alert('Ошибка при отправке сообщения');
+        input.value = text;
+      }
+    }
 
     // ---------- Создание группового чата ----------
     function showCreateGroupModal() {
@@ -1251,172 +1143,171 @@ async function sendMessage() {
     }
 
     // ---------- Информация о групповом чате ----------
-async function openChatInfo(chatId) {
-  if (!selectedChat || !selectedChat.isGroup) return;
+    async function openChatInfo(chatId) {
+      if (!selectedChat || !selectedChat.isGroup) return;
 
-  try {
-    const chatDoc = await db.collection('chats').doc(chatId).get();
-    const chat = chatDoc.data();
+      try {
+        const chatDoc = await db.collection('chats').doc(chatId).get();
+        const chat = chatDoc.data();
 
-    selectedChat = {
-      ...selectedChat,
-      participants: chat.participants,
-      name: chat.name
-    };
+        selectedChat = {
+          ...selectedChat,
+          participants: chat.participants,
+          name: chat.name
+        };
 
-    let participantsHTML = '<ul class="participants-list">';
-    for (const userId of chat.participants) {
-      const userData = await getUserById(userId);
-      if (userData) {
-        const isCreator = userId === chat.createdBy ? ' (создатель)' : '';
-        const canRemove = userId !== currentUser.uid && userId !== chat.createdBy;
-        participantsHTML += `<li>
-          ${userData.nickname} ${userData.tag}${isCreator}
-          ${canRemove ? `<button class="remove-participant-btn" onclick="removeParticipant('${userId}')">×</button>` : ''}
-        </li>`;
+        let participantsHTML = '<ul class="participants-list">';
+        for (const userId of chat.participants) {
+          const userData = await getUserById(userId);
+          if (userData) {
+            const isCreator = userId === chat.createdBy ? ' (создатель)' : '';
+            const canRemove = userId !== currentUser.uid && userId !== chat.createdBy;
+            participantsHTML += `<li>
+              ${userData.nickname} ${userData.tag}${isCreator}
+              ${canRemove ? `<button class="remove-participant-btn" onclick="removeParticipant('${userId}')">×</button>` : ''}
+            </li>`;
+          }
+        }
+        participantsHTML += '</ul>';
+
+        document.getElementById('groupInfoName').textContent = chat.name || 'Беседа';
+        document.getElementById('groupParticipants').innerHTML = participantsHTML;
+
+        const leaveBtn = document.getElementById('leaveGroupBtn');
+        if (chat.createdBy === currentUser.uid) {
+          leaveBtn.style.display = 'none';
+        } else {
+          leaveBtn.style.display = 'block';
+        }
+
+        document.getElementById('searchUsersToAdd').value = '';
+        document.getElementById('addParticipantsList').innerHTML = '<div class="no-users">Начните вводить имя для поиска</div>';
+
+        const deleteBtn = document.getElementById('deleteGroupBtn');
+        if (chat.createdBy === currentUser.uid) {
+          deleteBtn.style.display = 'inline-block';
+        } else {
+          deleteBtn.style.display = 'none';
+        }
+
+        document.getElementById('groupInfoModal').style.display = 'flex';
+
+      } catch (error) {
+        console.error('Ошибка загрузки информации о беседе:', error);
       }
     }
-    participantsHTML += '</ul>';
 
-    document.getElementById('groupInfoName').textContent = chat.name || 'Беседа';
-    document.getElementById('groupParticipants').innerHTML = participantsHTML;
-
-    const leaveBtn = document.getElementById('leaveGroupBtn');
-    if (chat.createdBy === currentUser.uid) {
-      leaveBtn.style.display = 'none';
-    } else {
-      leaveBtn.style.display = 'block';
+    function updateChatHeaderParticipantCount() {
+      if (selectedChat && selectedChat.isGroup) {
+        const participantCount = selectedChat.participants ? selectedChat.participants.length : 2;
+        const participantElement = document.querySelector('.selected-chat p');
+        if (participantElement) {
+          participantElement.textContent = `${participantCount} участников`;
+        }
+      }
     }
-
-    document.getElementById('searchUsersToAdd').value = '';
-    document.getElementById('addParticipantsList').innerHTML = '<div class="no-users">Начните вводить имя для поиска</div>';
-
-    const deleteBtn = document.getElementById('deleteGroupBtn');
-    if (chat.createdBy === currentUser.uid) {
-      deleteBtn.style.display = 'inline-block';
-    } else {
-      deleteBtn.style.display = 'none';
-    }
-
-    document.getElementById('groupInfoModal').style.display = 'flex';
-
-  } catch (error) {
-    console.error('Ошибка загрузки информации о беседе:', error);
-  }
-}
-
-// ---------- Обновление количества участников в шапке чата ----------
-function updateChatHeaderParticipantCount() {
-  if (selectedChat && selectedChat.isGroup) {
-    const participantCount = selectedChat.participants ? selectedChat.participants.length : 2;
-    const participantElement = document.querySelector('.selected-chat p');
-    if (participantElement) {
-      participantElement.textContent = `${participantCount} участников`;
-    }
-  }
-}
 
     async function removeParticipant(userId) {
-  if (!selectedChat || !selectedChat.isGroup) return;
+      if (!selectedChat || !selectedChat.isGroup) return;
 
-  if (!confirm('Удалить этого участника из беседы?')) return;
+      if (!confirm('Удалить этого участника из беседы?')) return;
 
-  try {
-    await db.collection('chats').doc(selectedChat.id).update({
-      participants: firebase.firestore.FieldValue.arrayRemove(userId)
-    });
-
-    const userData = await getUserById(userId);
-    if (userData) {
-      await db.collection('chats').doc(selectedChat.id)
-        .collection('messages')
-        .add({
-          text: `❌ ${userData.nickname} ${userData.tag} удален из беседы`,
-          senderId: 'system',
-          timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-          read: false,
-          isSystem: true
+      try {
+        await db.collection('chats').doc(selectedChat.id).update({
+          participants: firebase.firestore.FieldValue.arrayRemove(userId)
         });
-    }
 
-    const updatedChatDoc = await db.collection('chats').doc(selectedChat.id).get();
-    const updatedChat = updatedChatDoc.data();
+        const userData = await getUserById(userId);
+        if (userData) {
+          await db.collection('chats').doc(selectedChat.id)
+            .collection('messages')
+            .add({
+              text: `❌ ${userData.nickname} ${userData.tag} удален из беседы`,
+              senderId: 'system',
+              timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+              read: false,
+              isSystem: true
+            });
+        }
 
-    selectedChat = {
-      ...selectedChat,
-      participants: updatedChat.participants
-    };
+        const updatedChatDoc = await db.collection('chats').doc(selectedChat.id).get();
+        const updatedChat = updatedChatDoc.data();
 
-    await openChatInfo(selectedChat.id);
-    updateChatHeaderParticipantCount();
+        selectedChat = {
+          ...selectedChat,
+          participants: updatedChat.participants
+        };
 
-    if (unsubscribeChats) {
-      unsubscribeChats();
-    }
-    listenForChats();
+        await openChatInfo(selectedChat.id);
+        updateChatHeaderParticipantCount();
 
-  } catch (error) {
-    console.error('Ошибка удаления участника:', error);
-    alert('Ошибка при удалении участника');
-  }
-}
+        if (unsubscribeChats) {
+          unsubscribeChats();
+        }
+        listenForChats();
 
-   async function addSelectedParticipants() {
-  if (!selectedChat) return;
-
-  const checkboxes = document.querySelectorAll('#addParticipantsList input[type="checkbox"]:checked');
-  if (checkboxes.length === 0) {
-    alert('Выберите пользователей для добавления');
-    return;
-  }
-
-  const newParticipants = [];
-  checkboxes.forEach(cb => newParticipants.push(cb.value));
-
-  try {
-    await db.collection('chats').doc(selectedChat.id).update({
-      participants: firebase.firestore.FieldValue.arrayUnion(...newParticipants)
-    });
-
-    const addedNames = [];
-    for (const userId of newParticipants) {
-      const userData = await getUserById(userId);
-      if (userData) {
-        addedNames.push(`${userData.nickname} ${userData.tag}`);
+      } catch (error) {
+        console.error('Ошибка удаления участника:', error);
+        alert('Ошибка при удалении участника');
       }
     }
 
-    await db.collection('chats').doc(selectedChat.id)
-      .collection('messages')
-      .add({
-        text: `✅ Добавлены: ${addedNames.join(', ')}`,
-        senderId: 'system',
-        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-        read: false,
-        isSystem: true
-      });
+    async function addSelectedParticipants() {
+      if (!selectedChat) return;
 
-    const updatedChatDoc = await db.collection('chats').doc(selectedChat.id).get();
-    const updatedChat = updatedChatDoc.data();
+      const checkboxes = document.querySelectorAll('#addParticipantsList input[type="checkbox"]:checked');
+      if (checkboxes.length === 0) {
+        alert('Выберите пользователей для добавления');
+        return;
+      }
 
-    selectedChat = {
-      ...selectedChat,
-      participants: updatedChat.participants
-    };
+      const newParticipants = [];
+      checkboxes.forEach(cb => newParticipants.push(cb.value));
 
-    await openChatInfo(selectedChat.id);
-    updateChatHeaderParticipantCount();
+      try {
+        await db.collection('chats').doc(selectedChat.id).update({
+          participants: firebase.firestore.FieldValue.arrayUnion(...newParticipants)
+        });
 
-    if (unsubscribeChats) {
-      unsubscribeChats();
+        const addedNames = [];
+        for (const userId of newParticipants) {
+          const userData = await getUserById(userId);
+          if (userData) {
+            addedNames.push(`${userData.nickname} ${userData.tag}`);
+          }
+        }
+
+        await db.collection('chats').doc(selectedChat.id)
+          .collection('messages')
+          .add({
+            text: `✅ Добавлены: ${addedNames.join(', ')}`,
+            senderId: 'system',
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            read: false,
+            isSystem: true
+          });
+
+        const updatedChatDoc = await db.collection('chats').doc(selectedChat.id).get();
+        const updatedChat = updatedChatDoc.data();
+
+        selectedChat = {
+          ...selectedChat,
+          participants: updatedChat.participants
+        };
+
+        await openChatInfo(selectedChat.id);
+        updateChatHeaderParticipantCount();
+
+        if (unsubscribeChats) {
+          unsubscribeChats();
+        }
+        listenForChats();
+
+      } catch (error) {
+        console.error('Ошибка добавления участников:', error);
+        alert('Ошибка при добавлении участников');
+      }
     }
-    listenForChats();
-
-  } catch (error) {
-    console.error('Ошибка добавления участников:', error);
-    alert('Ошибка при добавлении участников');
-  }
-}
 
     async function leaveCurrentGroup() {
       if (!selectedChat || !selectedChat.isGroup) return;
@@ -1545,12 +1436,7 @@ function updateChatHeaderParticipantCount() {
     function enterChatMode() {
       isChatMode = true;
       document.body.classList.add('chat-mode');
-
-      // Скрываем нижнюю навигацию
-      const mobileNav = document.querySelector('.mobile-nav-bar');
-      if (mobileNav) {
-        mobileNav.style.display = 'none';
-      }
+      document.getElementById('mobileMenuBtn').style.display = 'none';
 
       const chatsSidebar = document.getElementById('chatsSidebar');
       if (chatsSidebar) {
@@ -1560,36 +1446,30 @@ function updateChatHeaderParticipantCount() {
       history.pushState({ chatMode: true }, '', window.location.href);
     }
 
-    // ---------- ИСПРАВЛЕННЫЙ выход из чата ----------
-function exitChatMode() {
-  isChatMode = false;
-  document.body.classList.remove('chat-mode');
+    function exitChatMode() {
+      isChatMode = false;
+      document.body.classList.remove('chat-mode');
+      document.getElementById('mobileMenuBtn').style.display = 'flex';
 
-  // Показываем нижнюю навигацию
-  const mobileNav = document.querySelector('.mobile-nav-bar');
-  if (mobileNav) {
-    mobileNav.style.display = 'flex';
-  }
+      const chatsSidebar = document.getElementById('chatsSidebar');
+      if (chatsSidebar) {
+        chatsSidebar.style.display = 'flex';
+      }
 
-  const chatsSidebar = document.getElementById('chatsSidebar');
-  if (chatsSidebar) {
-    chatsSidebar.style.display = 'flex';
-  }
+      if (unsubscribeMessages) {
+        unsubscribeMessages();
+        unsubscribeMessages = null;
+      }
 
-  if (unsubscribeMessages) {
-    unsubscribeMessages();
-    unsubscribeMessages = null;
-  }
-
-  selectedChat = null;
-  currentChatId = null;
-  document.getElementById('chatHeader').innerHTML = '<div class="no-chat-selected">Выберите чат для начала общения</div>';
-  document.getElementById('messagesContainer').innerHTML = '';
-  document.getElementById('messageInputArea').style.display = 'none';
-}
+      selectedChat = null;
+      currentChatId = null;
+      document.getElementById('chatHeader').innerHTML = '<div class="no-chat-selected">Выберите чат для начала общения</div>';
+      document.getElementById('messagesContainer').innerHTML = '';
+      document.getElementById('messageInputArea').style.display = 'none';
+    }
 
     // ---------- Обработка системной кнопки "назад" на телефоне ----------
-    window.addEventListener('popstate', function(event) {
+    window.addEventListener('popstate', function (event) {
       if (isChatMode) {
         exitChatMode();
       }
@@ -1599,14 +1479,23 @@ function exitChatMode() {
       window.location.href = `user.html?id=${userId}`;
     }
 
+    // ---------- Мобильное меню (бургер) ----------
+    function toggleMobileMenu() {
+      const menu = document.getElementById('mobilePopupMenu');
+      const overlay = document.getElementById('mobileMenuOverlay');
+      menu.classList.toggle('active');
+      overlay.classList.toggle('active');
+    }
+
     function logout() {
       auth.signOut().then(() => window.location.href = 'index.html');
     }
 
     // ---------- Обработка resize ----------
-    window.addEventListener('load', function() {
+    window.addEventListener('load', function () {
       if (window.innerWidth <= 768) {
         document.body.classList.remove('chat-mode');
+        document.getElementById('mobileMenuBtn').style.display = 'flex';
         document.getElementById('messageInputArea').style.display = 'none';
 
         const chatsSidebar = document.getElementById('chatsSidebar');
@@ -1616,25 +1505,16 @@ function exitChatMode() {
       }
     });
 
-    window.addEventListener('resize', function() {
+    window.addEventListener('resize', function () {
       if (window.innerWidth > 768) {
         document.body.classList.remove('chat-mode');
-
-        const mobileNav = document.querySelector('.mobile-nav-bar');
-        if (mobileNav) {
-          mobileNav.style.display = 'none';
-        }
+        document.getElementById('mobileMenuBtn').style.display = 'none';
 
         const chatsSidebar = document.getElementById('chatsSidebar');
         if (chatsSidebar) {
           chatsSidebar.style.display = 'flex';
         }
       } else {
-        const mobileNav = document.querySelector('.mobile-nav-bar');
-        if (mobileNav) {
-          mobileNav.style.display = 'flex';
-        }
-
         document.getElementById('mobileMenuBtn').style.display = isChatMode ? 'none' : 'flex';
 
         const chatsSidebar = document.getElementById('chatsSidebar');
@@ -1644,5 +1524,6 @@ function exitChatMode() {
       }
     });
   </script>
-  </body>
+</body>
+
 </html>
