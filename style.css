@@ -3248,3 +3248,240 @@ input:checked+.slider:before {
 * {
   transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
+/* Добавьте в конец файла style.css */
+
+/* ========== ИСПРАВЛЕНИЯ ДЛЯ ТЕМНОЙ ТЕМЫ ========== */
+
+/* Шапка профиля */
+.dark-theme .profile-header {
+  background: var(--bg-header);
+  border-bottom-color: var(--border-color);
+}
+
+.dark-theme .profile-header .back-btn {
+  color: var(--accent-color);
+}
+
+.dark-theme .profile-header .back-btn:hover {
+  background: var(--bg-hover);
+}
+
+.dark-theme .logout-small-header {
+  background: var(--danger-bg);
+  color: var(--danger-color);
+}
+
+.dark-theme .logout-small-header:hover {
+  background: var(--danger-hover);
+}
+
+/* Левая колонка профиля */
+.dark-theme .profile-left {
+  background: transparent;
+}
+
+.dark-theme .profile-card {
+  background: var(--bg-card);
+  box-shadow: var(--shadow-md);
+}
+
+.dark-theme .avatar-large {
+  background: var(--accent-color);
+}
+
+.dark-theme .profile-info {
+  background: var(--bg-secondary);
+}
+
+.dark-theme .info-row {
+  border-bottom-color: var(--border-color);
+}
+
+.dark-theme .info-row label {
+  color: var(--text-secondary);
+}
+
+.dark-theme .info-row span {
+  color: var(--text-primary);
+}
+
+.dark-theme .edit-btn {
+  color: var(--text-tertiary);
+}
+
+.dark-theme .edit-btn:hover {
+  color: var(--accent-color);
+  background: var(--bg-hover);
+}
+
+.dark-theme .edit-input {
+  background: var(--bg-input);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+/* Правая колонка профиля */
+.dark-theme .posts-header h2 {
+  color: var(--text-primary);
+}
+
+.dark-theme .create-post-btn {
+  background: var(--accent-color);
+  color: white;
+}
+
+.dark-theme .create-post-btn:hover {
+  background: var(--accent-hover);
+}
+
+.dark-theme .post-card {
+  background: var(--bg-card);
+  border-color: var(--border-color);
+}
+
+.dark-theme .post-card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.dark-theme .post-date {
+  color: var(--text-tertiary);
+}
+
+.dark-theme .post-content {
+  color: var(--text-primary);
+}
+
+.dark-theme .delete-post-btn {
+  color: var(--text-tertiary);
+}
+
+.dark-theme .delete-post-btn:hover {
+  color: var(--danger-color);
+  background: var(--danger-bg);
+}
+
+.dark-theme .no-posts {
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+}
+
+/* Страница user.html */
+.dark-theme .profile-container {
+  background: var(--bg-primary);
+}
+
+/* Модальные окна */
+.dark-theme .modal-content {
+  background: var(--bg-card);
+  border-color: var(--border-color);
+}
+
+.dark-theme .modal-header {
+  border-bottom-color: var(--border-color);
+}
+
+.dark-theme .modal-header h3 {
+  color: var(--text-primary);
+}
+
+.dark-theme .modal-close {
+  color: var(--text-secondary);
+}
+
+.dark-theme .modal-close:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.dark-theme .modal-body textarea {
+  background: var(--bg-input);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+
+.dark-theme .modal-body textarea:focus {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+.dark-theme .modal-cancel-btn {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.dark-theme .modal-cancel-btn:hover {
+  background: var(--bg-hover);
+}
+
+.dark-theme .modal-save-btn {
+  background: var(--accent-color);
+  color: white;
+}
+
+.dark-theme .modal-save-btn:hover {
+  background: var(--accent-hover);
+}
+
+/* Скелетоны */
+.dark-theme .skeleton-circle,
+.dark-theme .skeleton-line,
+.dark-theme .skeleton-post {
+  background: linear-gradient(90deg, var(--skeleton-start) 25%, var(--skeleton-mid) 50%, var(--skeleton-start) 75%);
+}
+
+/* Сообщения об ошибках */
+.dark-theme .error {
+  background: var(--danger-bg);
+  color: var(--danger-color);
+}
+
+.dark-theme .success {
+  background: var(--success-bg);
+  color: var(--success-color);
+}
+
+.dark-theme .warning {
+  background: var(--warning-bg);
+  color: var(--warning-color);
+}
+
+.dark-theme .info {
+  background: var(--accent-light);
+  color: var(--accent-color);
+}
+
+/* Загрузка */
+.dark-theme .loading {
+  color: var(--text-secondary);
+}
+
+/* Список чатов в профиле */
+.dark-theme .chats-list {
+  background: var(--bg-primary);
+}
+
+/* Кнопка назад в user.html */
+.dark-theme .back-btn {
+  color: var(--accent-color);
+}
+
+.dark-theme .back-btn:hover {
+  background: var(--bg-hover);
+}
+/* В самое начало файла, после импорта */
+html {
+  background: #ffffff;
+}
+
+html.dark-theme {
+  background: #0f0f0f;
+}
+
+body {
+  background: #ffffff;
+  transition: background 0.2s ease;
+}
+
+body.dark-theme {
+  background: #0f0f0f;
+}

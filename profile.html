@@ -10,10 +10,12 @@
         document.documentElement.classList.add('dark-theme');
         document.body.classList.add('dark-theme');
         document.body.style.backgroundColor = '#0f0f0f';
+        document.documentElement.style.backgroundColor = '#0f0f0f';
       } else {
         document.documentElement.classList.add('light-theme');
         document.body.classList.add('light-theme');
         document.body.style.backgroundColor = '#ffffff';
+        document.documentElement.style.backgroundColor = '#ffffff';
       }
     })();
   </script>
@@ -133,6 +135,20 @@
     }
 
     currentUserData = userDoc.data();
+    // После строки currentUserData = userDoc.data();
+    // Добавьте проверку темы
+    if (currentUserData.theme) {
+      const currentTheme = document.body.classList.contains('dark-theme') ? 'dark' : 'light';
+      if (currentUserData.theme !== currentTheme) {
+        if (currentUserData.theme === 'dark') {
+          document.body.classList.add('dark-theme');
+          document.body.classList.remove('light-theme');
+        } else {
+          document.body.classList.add('light-theme');
+          document.body.classList.remove('dark-theme');
+        }
+      }
+    }
     userCache.set(user.uid, currentUserData);
 
     // Обновляем аватар
