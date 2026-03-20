@@ -5,6 +5,22 @@
   <meta charset="UTF-8">
   <meta name="viewport"
     content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
+    <script>
+      (function () {
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark') {
+          document.documentElement.classList.add('dark-theme');
+          document.body.classList.add('dark-theme');
+          document.body.style.backgroundColor = '#0a0a0f';
+          document.documentElement.style.backgroundColor = '#0a0a0f';
+        } else {
+          document.documentElement.classList.add('light-theme');
+          document.body.classList.add('light-theme');
+          document.body.style.backgroundColor = '#ffffff';
+          document.documentElement.style.backgroundColor = '#ffffff';
+        }
+      })();
+    </script>
   <title>Мессенджер</title>
   <!-- Для messenger.html -->
   <link rel="icon"
