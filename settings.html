@@ -4,15 +4,17 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes, viewport-fit=cover">
   <script>
-    (function () {
-      // Проверяем localStorage и применяем тему до загрузки CSS
-      const savedTheme = localStorage.getItem('theme');
-      if (savedTheme === 'dark') {
-        document.documentElement.style.backgroundColor = '#0f0f0f';
-        document.body.style.backgroundColor = '#0f0f0f';
-      }
-    })();
-  </script>
+  (function() {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark') {
+      document.documentElement.classList.add('dark-theme');
+      // Дополнительно вешаем на body, когда он появится
+      document.addEventListener('DOMContentLoaded', () => {
+        document.body.classList.add('dark-theme');
+      });
+    }
+  })();
+</script>
   <title>Настройки</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚙️</text></svg>">
   <link rel="stylesheet" href="style.css">
@@ -21,6 +23,15 @@
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
 </head>
 <body class="settings-page">
+<div class="nav-sidebar">
+  <h2>Меню</h2>
+  <div class="nav-buttons">
+    <a href="messenger.html" class="nav-button">💬 Чаты</a>
+    <a href="profile.html" class="nav-button profile">👤 Профиль</a>
+    <a href="settings.html" class="nav-button">⚙️ Настройки</a>
+    <button onclick="logout()" class="nav-button logout">🚪 Выйти</button>
+  </div>
+</div>
   <div class="settings-container">
     <div class="settings-header">
       <a href="messenger.html" class="back-btn"><</a>
@@ -157,31 +168,29 @@
     });
 
     async function toggleTheme(isDark) {
-      const theme = isDark ? 'dark' : 'light';
+  const theme = isDark ? 'dark' : 'light';
+  
+  // 1. Мгновенно применяем классы
+  if (isDark) {
+    document.body.classList.add('dark-theme');
+    document.documentElement.classList.add('dark-theme');
+  } else {
+    document.body.classList.remove('dark-theme');
+    document.documentElement.classList.remove('dark-theme');
+  }
 
-      // Мгновенно применяем тему на странице
-      if (isDark) {
-        document.body.classList.add('dark-theme');
-        document.body.classList.remove('light-theme');
-      } else {
-        document.body.classList.add('light-theme');
-        document.body.classList.remove('dark-theme');
-      }
+  // 2. Сохраняем локально для скорости
+  localStorage.setItem('theme', theme);
 
-      // Сохраняем в localStorage для быстрой загрузки
-      localStorage.setItem('theme', theme);
-
-      // Сохраняем в Firebase
-      if (currentUser) {
-        try {
-          await db.collection('users').doc(currentUser.uid).update({
-            theme: theme
-          });
-        } catch (error) {
-          console.error('Ошибка сохранения темы:', error);
-        }
-      }
+  // 3. Сохраняем в Firebase для синхронизации между устройствами
+  if (auth.currentUser) {
+    try {
+      await db.collection('users').doc(auth.currentUser.uid).update({ theme });
+    } catch (e) {
+      console.error("Ошибка сохранения в Firebase:", e);
     }
+  }
+}
 
     function logout() {
       auth.signOut().then(() => window.location.href = 'index.html');

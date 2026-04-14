@@ -3,23 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script>
-    (function () {
-      const savedTheme = localStorage.getItem('theme');
-      if (savedTheme === 'dark') {
-        document.documentElement.classList.add('dark-theme');
-        document.body.classList.add('dark-theme');
-        document.body.style.backgroundColor = '#0f0f0f';
-        document.documentElement.style.backgroundColor = '#0f0f0f';
-      } else {
-        document.documentElement.classList.add('light-theme');
-        document.body.classList.add('light-theme');
-        document.body.style.backgroundColor = '#ffffff';
-        document.documentElement.style.backgroundColor = '#ffffff';
-      }
-    })();
-  </script>
   <title>Профиль пользователя</title>
+<script>
+  (function() {
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'dark') {
+      document.documentElement.classList.add('dark-theme');
+      // Дополнительно вешаем на body, когда он появится
+      document.addEventListener('DOMContentLoaded', () => {
+        document.body.classList.add('dark-theme');
+      });
+    }
+  })();
+</script>
 <!-- Для profile.html -->
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👤</text></svg>">
   <link rel="stylesheet" href="style.css">
@@ -28,11 +24,20 @@
   <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
 </head>
 <body>
+<div class="nav-sidebar">
+  <h2>Меню</h2>
+  <div class="nav-buttons">
+    <a href="messenger.html" class="nav-button">💬 Чаты</a>
+    <a href="profile.html" class="nav-button profile">👤 Профиль</a>
+    <a href="settings.html" class="nav-button">⚙️ Настройки</a>
+    <button onclick="logout()" class="nav-button logout">🚪 Выйти</button>
+  </div>
+</div>
   <div class="profile-container">
     <div class="profile-header">
       <a href="messenger.html" class="back-btn" id="backButton"><</a>
     </div>
-
+    
     <div class="profile-two-columns" id="profileContent">
       <div class="loading">Загрузка профиля...</div>
     </div>
@@ -43,7 +48,7 @@
     // Получаем ID пользователя из URL
     const urlParams = new URLSearchParams(window.location.search);
     const userId = urlParams.get('id');
-
+    
     if (!userId) {
       window.location.href = 'messenger.html';
     }
@@ -59,13 +64,13 @@
         window.location.href = 'index.html';
         return;
       }
-
+      
       currentUser = user;
-
+      
       try {
         // Загружаем информацию о пользователе
         const userDoc = await db.collection('users').doc(userId).get();
-
+        
         if (!userDoc.exists) {
           document.getElementById('profileContent').innerHTML = `
             <div class="error">Пользователь не найден</div>
@@ -73,23 +78,10 @@
           `;
           return;
         }
-
+        
         const userData = userDoc.data();
-        // После получения userData, добавьте
-        if (userData.theme) {
-          const currentTheme = document.body.classList.contains('dark-theme') ? 'dark' : 'light';
-          if (userData.theme !== currentTheme) {
-            if (userData.theme === 'dark') {
-              document.body.classList.add('dark-theme');
-              document.body.classList.remove('light-theme');
-            } else {
-              document.body.classList.add('light-theme');
-              document.body.classList.remove('dark-theme');
-            }
-          }
-        }
         const firstLetter = userData.nickname.charAt(0).toUpperCase();
-
+        
         // Отображаем профиль
         document.getElementById('profileContent').innerHTML = `
           <!-- Левая колонка - информация о пользователе -->
@@ -98,13 +90,13 @@
               <div class="profile-avatar-placeholder">
                 <div class="avatar-large">${firstLetter}</div>
               </div>
-
+              
               <div class="profile-info">
                 <div class="info-row">
                   <label>Никнейм:</label>
                   <span>${userData.nickname}</span>
                 </div>
-
+                
                 <div class="info-row">
                   <label>Тег:</label>
                   <span>${userData.tag}</span>
@@ -112,22 +104,22 @@
               </div>
             </div>
           </div>
-
+          
           <!-- Правая колонка - посты -->
           <div class="profile-right">
             <div class="posts-header">
               <h2>Посты пользователя</h2>
             </div>
-
+            
             <div class="posts-container" id="postsContainer">
               <div class="loading">Загрузка постов...</div>
             </div>
           </div>
         `;
-
+        
         // Загружаем посты
         loadPosts(userId);
-
+        
       } catch (error) {
         console.error('Ошибка загрузки профиля:', error);
         document.getElementById('profileContent').innerHTML = '<div class="error">Ошибка загрузки профиля</div>';
@@ -136,33 +128,33 @@
 
     async function loadPosts(targetUserId) {
       const postsContainer = document.getElementById('postsContainer');
-
+      
       // Отписываемся от предыдущего слушателя
       if (unsubscribePosts) {
         unsubscribePosts();
       }
-
+      
       try {
         // Проверяем существование коллекции posts
         const postsRef = db.collection('posts');
-
+        
         // Слушаем изменения в постах в реальном времени
         unsubscribePosts = postsRef
           .where('userId', '==', targetUserId)
           .orderBy('createdAt', 'desc')
           .onSnapshot(snapshot => {
             console.log('Posts snapshot received:', snapshot.size);
-
+            
             if (snapshot.empty) {
               postsContainer.innerHTML = '<div class="no-posts">У пользователя пока нет постов</div>';
               return;
             }
-
+            
             let postsHTML = '';
             snapshot.forEach(doc => {
               const post = doc.data();
               console.log('Post data:', post);
-
+              
               let date = 'Дата неизвестна';
               if (post.createdAt) {
                 try {
@@ -171,7 +163,7 @@
                   date = 'Только что';
                 }
               }
-
+              
               postsHTML += `
                 <div class="post-card">
                   <div class="post-header">
@@ -181,7 +173,7 @@
                 </div>
               `;
             });
-
+            
             postsContainer.innerHTML = postsHTML;
           }, error => {
             console.error('Ошибка загрузки постов:', error);
@@ -191,7 +183,7 @@
               postsContainer.innerHTML = '<div class="error">Ошибка загрузки постов</div>';
             }
           });
-
+          
       } catch (error) {
         console.error('Ошибка:', error);
         postsContainer.innerHTML = '<div class="error">Ошибка загрузки постов</div>';
